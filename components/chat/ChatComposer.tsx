@@ -430,22 +430,22 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
 
               {/* Spacious, Premium Tool Menu (ChatGPT scale & hierarchy) */}
               {showPlusMenu && (
-                <div className="absolute bottom-[calc(100%+12px)] left-0 w-[310px] sm:w-[360px] rounded-[24px] bg-[#171717] border border-[#444654] shadow-2xl p-2.5 sm:p-3 z-50 animate-in fade-in zoom-in-95 duration-150">
-                  <div className="flex flex-col gap-1">
+                <div className="absolute bottom-[calc(100%+12px)] left-0 w-[280px] sm:w-[320px] rounded-2xl bg-[#212121] shadow-[0_0_40px_rgba(0,0,0,0.5)] p-2 z-50 animate-in fade-in zoom-in-95 duration-150 border border-white/5">
+                  <div className="flex flex-col">
                     {/* 1. Add photos & files */}
                     <button
                       type="button"
                       onClick={() => { fileInputRef.current?.click(); setShowPlusMenu(false); }}
-                      className="w-full flex items-center gap-3.5 p-3 rounded-2xl hover:bg-[#212121] transition-all text-left group cursor-pointer"
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#2F2F2F] transition-colors text-left group cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#5486E9]"
                     >
-                      <div className="h-11 w-11 rounded-2xl bg-[#5486E9]/15 border border-[#5486E9]/30 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                        <Paperclip className="h-5 w-5 text-[#5486E9] stroke-[2.2]" />
+                      <div className="flex items-center justify-center shrink-0 text-[#C5C5D2] group-hover:text-white transition-colors">
+                        <Paperclip className="h-5 w-5 stroke-[2]" />
                       </div>
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-[15px] font-semibold text-[#ECECF1] group-hover:text-white truncate">
+                      <div className="flex flex-col min-w-0 flex-1">
+                        <span className="text-[14px] font-medium text-[#ECECF1] group-hover:text-white truncate transition-colors">
                           Add photos & files
                         </span>
-                        <span className="text-[12px] text-[#C5C5D2] truncate">
+                        <span className="text-[12px] text-[#8E8EA0] truncate">
                           Upload documents, spreadsheets, images
                         </span>
                       </div>
@@ -458,16 +458,16 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                         addToast({ title: 'Library', description: 'Select a saved file from your Nexorbit Library', type: 'info' }); 
                         setShowPlusMenu(false); 
                       }}
-                      className="w-full flex items-center gap-3.5 p-3 rounded-2xl hover:bg-[#212121] transition-all text-left group cursor-pointer"
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#2F2F2F] transition-colors text-left group cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#5486E9]"
                     >
-                      <div className="h-11 w-11 rounded-2xl bg-[#8B5CF6]/15 border border-[#8B5CF6]/30 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                        <Library className="h-5 w-5 text-[#A78BFA] stroke-[2.2]" />
+                      <div className="flex items-center justify-center shrink-0 text-[#C5C5D2] group-hover:text-white transition-colors">
+                        <Library className="h-5 w-5 stroke-[2]" />
                       </div>
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-[15px] font-semibold text-[#ECECF1] group-hover:text-white truncate">
+                      <div className="flex flex-col min-w-0 flex-1">
+                        <span className="text-[14px] font-medium text-[#ECECF1] group-hover:text-white truncate transition-colors">
                           Add from Library
                         </span>
-                        <span className="text-[12px] text-[#C5C5D2] truncate">
+                        <span className="text-[12px] text-[#8E8EA0] truncate">
                           Browse files and workspace items
                         </span>
                       </div>
@@ -477,16 +477,16 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                     <button
                       type="button"
                       onClick={() => { setShowImagePanel(true); setShowPlusMenu(false); }}
-                      className="w-full flex items-center gap-3.5 p-3 rounded-2xl hover:bg-[#212121] transition-all text-left group cursor-pointer"
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#2F2F2F] transition-colors text-left group cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#5486E9]"
                     >
-                      <div className="h-11 w-11 rounded-2xl bg-[#EC4899]/15 border border-[#EC4899]/30 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                        <ImageIcon className="h-5 w-5 text-[#F472B6] stroke-[2.2]" />
+                      <div className="flex items-center justify-center shrink-0 text-[#C5C5D2] group-hover:text-white transition-colors">
+                        <ImageIcon className="h-5 w-5 stroke-[2]" />
                       </div>
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-[15px] font-semibold text-[#ECECF1] group-hover:text-white truncate">
+                      <div className="flex flex-col min-w-0 flex-1">
+                        <span className="text-[14px] font-medium text-[#ECECF1] group-hover:text-white truncate transition-colors">
                           Create image
                         </span>
-                        <span className="text-[12px] text-[#C5C5D2] truncate">
+                        <span className="text-[12px] text-[#8E8EA0] truncate">
                           Generate visual concepts and art
                         </span>
                       </div>
@@ -496,27 +496,27 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                     <button
                       type="button"
                       onClick={() => { if (onToggleWebSearch) onToggleWebSearch(); setShowPlusMenu(false); }}
-                      className="w-full flex items-center gap-3.5 p-3 rounded-2xl hover:bg-[#212121] transition-all text-left group cursor-pointer"
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#2F2F2F] transition-colors text-left group cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#5486E9]"
                     >
-                      <div className="h-11 w-11 rounded-2xl bg-[#10A37F]/15 border border-[#10A37F]/30 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                        <Search className="h-5 w-5 text-[#10A37F] stroke-[2.2]" />
+                      <div className="flex items-center justify-center shrink-0 text-[#C5C5D2] group-hover:text-white transition-colors">
+                        <Search className="h-5 w-5 stroke-[2]" />
                       </div>
                       <div className="flex flex-col min-w-0 flex-1">
-                        <span className="text-[15px] font-semibold text-[#ECECF1] group-hover:text-white truncate">
+                        <span className="text-[14px] font-medium text-[#ECECF1] group-hover:text-white truncate transition-colors">
                           Web search
                         </span>
-                        <span className="text-[12px] text-[#C5C5D2] truncate">
+                        <span className="text-[12px] text-[#8E8EA0] truncate">
                           Search live web for real-time answers
                         </span>
                       </div>
-                      {webSearchEnabled && <CheckCircle2 className="h-5 w-5 text-[#10A37F] ml-auto shrink-0" />}
+                      {webSearchEnabled && <CheckCircle2 className="h-4.5 w-4.5 text-[#5486E9] ml-auto shrink-0" />}
                     </button>
 
                     {/* 5. Connectors (Only connected services) */}
                     {activePlugins.length > 0 && (
                       <>
-                        <div className="h-[1px] bg-[#444654] my-1.5 mx-2" />
-                        <div className="px-3.5 py-1 text-[11px] font-bold text-[#C5C5D2] uppercase tracking-wider">
+                        <div className="h-[1px] bg-white/10 my-1 mx-2" />
+                        <div className="px-3 py-1.5 text-[11px] font-medium text-[#8E8EA0] uppercase tracking-wider">
                           Connectors
                         </div>
                         {activePlugins.map(plugin => {
@@ -526,20 +526,20 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                               key={plugin.id}
                               type="button"
                               onClick={() => handleToggleConnector(plugin.id)}
-                              className="w-full flex items-center gap-3.5 p-3 rounded-2xl hover:bg-[#212121] transition-all text-left group cursor-pointer"
+                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#2F2F2F] transition-colors text-left group cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#5486E9]"
                             >
-                              <div className="h-11 w-11 rounded-2xl bg-[#212121] border border-[#444654] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                              <div className="flex items-center justify-center shrink-0 text-[#C5C5D2] group-hover:text-white transition-colors">
                                 {getConnectorIcon(plugin.id, "h-5 w-5")}
                               </div>
                               <div className="flex flex-col min-w-0 flex-1">
-                                <span className="text-[15px] font-semibold text-[#ECECF1] group-hover:text-white truncate">
+                                <span className="text-[14px] font-medium text-[#ECECF1] group-hover:text-white truncate transition-colors">
                                   {plugin.name}
                                 </span>
-                                <span className="text-[12px] text-[#C5C5D2] truncate">
+                                <span className="text-[12px] text-[#8E8EA0] truncate">
                                   {plugin.accountEmail || 'Connected'}
                                 </span>
                               </div>
-                              {isSelected && <CheckCircle2 className="h-5 w-5 text-[#5486E9] ml-auto shrink-0" />}
+                              {isSelected && <CheckCircle2 className="h-4.5 w-4.5 text-[#5486E9] ml-auto shrink-0" />}
                             </button>
                           );
                         })}
