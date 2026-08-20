@@ -122,12 +122,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const activePlaceholder = useMemo(() => {
-    if (!placeholder || placeholder === 'Ask anything' || placeholder === 'Ask anything...') {
-      return getRotatingPlaceholder();
-    }
-    return placeholder;
-  }, [placeholder]);
+  const [tempMode, setTempMode] = useState<'normal' | 'image' | 'library'>('normal');
 
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [showImagePanel, setShowImagePanel] = useState(false);
@@ -142,6 +137,81 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
     return IntegrationService.getPlugins().filter(p => p.connectionStatus === 'CONNECTED');
   });
   const [selectedConnectors, setSelectedConnectors] = useState<Set<string>>(new Set());
+
+  // Derived activeMode based on reactive props and user tool selection
+  const activeMode = useMemo(() => {
+    if (webSearchEnabled) {
+      return 'search';
+    }
+    if (selectedConnectors.size > 0) {
+      return 'connectors';
+    }
+    return tempMode;
+  }, [webSearchEnabled, selectedConnectors.size, tempMode]);
+
+  const activePlaceholder = useMemo(() => {
+    if (activeMode === 'search') {
+      return 'What should we search for?';
+    }
+    if (activeMode === 'image') {
+      return 'Describe the image you want to create...';
+    }
+    if (activeMode === 'library') {
+      return 'Ask about your selected files...';
+    }
+    if (activeMode === 'connectors') {
+      return 'Ask about your connected apps...';
+    }
+    if (attachments.length > 0) {
+      return 'selected attachments...';
+    }
+    return 'What task should we solve next?';
+  }, [activeMode, attachments.length]);
+
+  // Handle escape to close plus menu
+  useEffect(() => {
+    const handleKeyDownGlobal = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowPlusMenu(false);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDownGlobal);
+    return () => document.removeEventListener('keydown', handleKeyDownGlobal);
+  }, []);
+
+  const handleSelectMode = (mode: 'search' | 'image' | 'library' | 'connectors') => {
+    if (mode === 'search') {
+      setSelectedConnectors(new Set());
+      setTempMode('normal');
+      if (!webSearchEnabled && onToggleWebSearch) {
+        onToggleWebSearch();
+      }
+    } else if (mode === 'connectors') {
+      if (webSearchEnabled && onToggleWebSearch) {
+        onToggleWebSearch();
+      }
+      setTempMode('normal');
+    } else {
+      if (webSearchEnabled && onToggleWebSearch) {
+        onToggleWebSearch();
+      }
+      setSelectedConnectors(new Set());
+      setTempMode(mode as 'image' | 'library');
+    }
+    setShowPlusMenu(false);
+  };
+
+  const handleClearMode = () => {
+    if (activeMode === 'search') {
+      if (webSearchEnabled && onToggleWebSearch) {
+        onToggleWebSearch();
+      }
+    } else if (activeMode === 'connectors') {
+      setSelectedConnectors(new Set());
+    } else {
+      setTempMode('normal');
+    }
+  };
 
   // Load connected plugins
   useEffect(() => {
@@ -186,8 +256,27 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
       }
       return;
     }
+
+    if (activeMode === 'image') {
+      if (!inputText.trim() || isThinking) return;
+      if (onGenerateImage) {
+        onGenerateImage(inputText.trim(), { style: 'None', aspectRatio: '1:1' });
+        setInputText('');
+        setActiveMode('normal');
+      }
+      return;
+    }
+
     if ((!inputText.trim() && attachments.length === 0) || isThinking) return;
     onSubmit(e, attachments, webSearchEnabled);
+
+    // Clear temporary modes after submission
+    if (activeMode === 'library') {
+      setActiveMode('normal');
+    } else if (activeMode === 'connectors') {
+      setSelectedConnectors(new Set());
+      setActiveMode('normal');
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -204,6 +293,11 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
       else next.add(id);
       return next;
     });
+    
+    if (webSearchEnabled && onToggleWebSearch) {
+      onToggleWebSearch();
+    }
+    setActiveMode('connectors');
     setShowPlusMenu(false);
   };
 
@@ -241,47 +335,6 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
         onSubmit={handleSubmitForm}
         className="w-full rounded-[26px] sm:rounded-[28px] bg-[#212121] border border-white/[0.12] p-2 sm:p-2.5 shadow-xl space-y-1.5 focus-within:border-white/[0.24] transition-all duration-150"
       >
-        {/* Active Tool Status Badges & Connector Chips inside composer */}
-        {!showImagePanel && (webSearchEnabled || selectedConnectors.size > 0) && (
-          <div className="flex flex-wrap items-center gap-1.5 px-1.5 pt-0.5 pb-1 border-b border-white/[0.06]">
-            {webSearchEnabled && (
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#10A37F]/15 border border-[#10A37F]/30 text-[11px] font-medium text-[#10A37F] animate-in fade-in">
-                <Search className="h-3 w-3" />
-                <span>Web Search</span>
-                {onToggleWebSearch && (
-                  <button
-                    type="button"
-                    onClick={onToggleWebSearch}
-                    className="hover:text-white ml-0.5 cursor-pointer"
-                    aria-label="Disable web search"
-                    title="Disable web search"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                )}
-              </div>
-            )}
-
-            {selectedConnectors.size > 0 && Array.from(selectedConnectors).map(id => {
-              const plugin = activePlugins.find(p => p.id === id);
-              if (!plugin) return null;
-              return (
-                <div key={id} className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#38BDF8]/15 border border-[#38BDF8]/30 text-[11px] font-medium text-[#38BDF8] animate-in fade-in">
-                  {getConnectorIcon(plugin.id, "h-3 w-3")}
-                  <span>{plugin.name}</span>
-                  <button 
-                    type="button" 
-                    onClick={() => handleToggleConnector(id)}
-                    className="hover:text-white transition-colors ml-0.5 cursor-pointer"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
         {/* Rich Compact Attachment Previews inside composer */}
         {!showImagePanel && attachments && attachments.length > 0 && (
           <div className="flex flex-wrap gap-2 px-1.5 pt-1 pb-1">
@@ -456,7 +509,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                       type="button"
                       onClick={() => { 
                         addToast({ title: 'Library', description: 'Select a saved file from your Nexorbit Library', type: 'info' }); 
-                        setShowPlusMenu(false); 
+                        handleSelectMode('library');
                       }}
                       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#2F2F2F] transition-colors text-left group cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#5486E9]"
                     >
@@ -476,7 +529,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                     {/* 3. Create image */}
                     <button
                       type="button"
-                      onClick={() => { setShowImagePanel(true); setShowPlusMenu(false); }}
+                      onClick={() => handleSelectMode('image')}
                       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#2F2F2F] transition-colors text-left group cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#5486E9]"
                     >
                       <div className="flex items-center justify-center shrink-0 text-[#C5C5D2] group-hover:text-white transition-colors">
@@ -495,7 +548,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                     {/* 4. Web search */}
                     <button
                       type="button"
-                      onClick={() => { if (onToggleWebSearch) onToggleWebSearch(); setShowPlusMenu(false); }}
+                      onClick={() => handleSelectMode('search')}
                       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#2F2F2F] transition-colors text-left group cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#5486E9]"
                     >
                       <div className="flex items-center justify-center shrink-0 text-[#C5C5D2] group-hover:text-white transition-colors">
@@ -550,6 +603,62 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                 </div>
               )}
             </div>
+
+            {/* SELECTED TOOL INDICATOR */}
+            {activeMode !== 'normal' ? (
+              <div 
+                id="selected-tool-indicator"
+                className="flex items-center gap-1.5 bg-white/[0.06] hover:bg-white/[0.1] text-[#ECECF1] px-2.5 py-1.5 rounded-xl border border-white/5 shadow-inner text-xs select-none shrink-0 mb-0.5 transition-colors"
+              >
+                <div className="text-white shrink-0">
+                  {activeMode === 'search' && <Search className="h-4 w-4 stroke-[2]" />}
+                  {activeMode === 'image' && <ImageIcon className="h-4 w-4 stroke-[2]" />}
+                  {activeMode === 'library' && <Library className="h-4 w-4 stroke-[2]" />}
+                  {activeMode === 'connectors' && <Settings className="h-4 w-4 stroke-[2]" />}
+                </div>
+                
+                <span className="font-medium text-[13px] text-[#ECECF1] whitespace-nowrap">
+                  {activeMode === 'search' && 'Web search'}
+                  {activeMode === 'image' && 'Create image'}
+                  {activeMode === 'library' && 'Library'}
+                  {activeMode === 'connectors' && 'Connectors'}
+                </span>
+                
+                <span className="text-white/15 mx-0.5 font-light">|</span>
+                
+                <button
+                  type="button"
+                  onClick={handleClearMode}
+                  className="text-white/40 hover:text-white transition-colors cursor-pointer p-0.5 -mr-1 rounded-md hover:bg-white/5"
+                  aria-label="Remove mode"
+                  title="Remove mode"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ) : attachments.length > 0 ? (
+              <div 
+                id="selected-files-indicator"
+                className="flex items-center gap-1.5 bg-white/[0.06] hover:bg-white/[0.1] text-[#ECECF1] px-2.5 py-1.5 rounded-xl border border-white/5 shadow-inner text-xs select-none shrink-0 mb-0.5 transition-colors"
+              >
+                <Paperclip className="h-4 w-4 text-white stroke-[2]" />
+                <span className="font-medium text-[13px] text-[#ECECF1] whitespace-nowrap">Files</span>
+                <span className="text-white/15 mx-0.5 font-light">|</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (attachments.length > 0 && onRemoveAttachment) {
+                      attachments.forEach(file => onRemoveAttachment(file.id));
+                    }
+                  }}
+                  className="text-white/40 hover:text-white transition-colors cursor-pointer p-0.5 -mr-1 rounded-md hover:bg-white/5"
+                  aria-label="Clear files"
+                  title="Clear files"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ) : null}
 
             {/* EXPANDABLE INPUT TEXTAREA */}
             <textarea
