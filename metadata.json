@@ -1,0 +1,6 @@
+{
+  "name": "Nexorbit",
+  "description": "Your AI Brain for the Digital World. Unified context, intelligence gateway, and secure action execution.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,255 @@
+import { ConnectorItem } from './types';
+
+export const INITIAL_MOCK_CONNECTORS: ConnectorItem[] = [
+  {
+    id: 'gmail',
+    name: 'Gmail',
+    category: 'Google Workspace',
+    description: 'Emails and conversations that help Nexorbit understand your work and relationships.',
+    humanPermissionSummary: 'Read relevant emails when needed.',
+    status: 'not_connected',
+    statusLabel: 'Not connected',
+    contextItems: ['Emails', 'Conversations', 'Relevant metadata'],
+    uses: [
+      'Email threads and conversations you choose to make available',
+      'Sender details and meeting requests',
+      'Key timelines and commitment dates',
+    ],
+    wonts: [
+      'Send emails without your explicit confirmation',
+      'Delete or modify your inbox messages',
+      'Share conversation contents with external services',
+    ],
+    permissions: {
+      access: [
+        'Email thread text and sender information',
+        'Timestamps and subject headers for indexing',
+        'Attached document references',
+      ],
+      use: [
+        'Helps Nexorbit synthesize timeline updates for Goals',
+        'Provides conversation background when answering Ask My World',
+        'Identifies pending client requests in Clean My Day',
+      ],
+      control: [
+        'Disconnect anytime with a single click',
+        'Revoke access via Google Account settings',
+        'Delete indexed email summaries upon request',
+      ],
+    },
+    brandColor: 'text-red-500 bg-red-50 border-red-100',
+  },
+  {
+    id: 'calendar',
+    name: 'Google Calendar',
+    category: 'Google Workspace',
+    description: 'Meetings, schedules and events that provide context for your day.',
+    humanPermissionSummary: 'Read calendar events to understand your schedule.',
+    status: 'not_connected',
+    statusLabel: 'Not connected',
+    contextItems: ['Event details', 'Participant lists', 'Meeting descriptions'],
+    uses: [
+      'Upcoming meeting agendas and participant lists',
+      'Time blocks and scheduling conflicts',
+      'Event links and conference details',
+    ],
+    wonts: [
+      'Create or delete calendar events without approval',
+      'Invite external participants without your consent',
+      'Expose private personal events',
+    ],
+    permissions: {
+      access: [
+        'Event titles, start/end times, and descriptions',
+        'Attendee names and response statuses',
+        'Location and video link metadata',
+      ],
+      use: [
+        'Highlights today’s focus agenda in Clean My Day',
+        'Warns about scheduling bottlenecks in Goals',
+        'Informs meeting preparation in Ask My World',
+      ],
+      control: [
+        'Pause calendar synchronization at any time',
+        'Disconnect integration instantly',
+        'Configure calendar visibility preferences',
+      ],
+    },
+    brandColor: 'text-blue-500 bg-blue-50 border-blue-100',
+  },
+  {
+    id: 'drive',
+    name: 'Google Drive',
+    category: 'Google Workspace',
+    description: 'Documents and files that provide context for your projects.',
+    humanPermissionSummary: 'Access files you choose to connect.',
+    status: 'not_connected',
+    statusLabel: 'Not connected',
+    contextItems: ['Documents', 'Spreadsheets', 'Project proposals'],
+    uses: [
+      'Documents and file texts you choose to make available',
+      'Revision history and project specs',
+      'File titles and organization tags',
+    ],
+    wonts: [
+      'Edit or overwrite your document contents',
+      'Delete files from your Google Drive',
+      'Share drive links externally',
+    ],
+    permissions: {
+      access: [
+        'Document text content and title metadata',
+        'File structure and creation dates',
+        'Comment threads where explicitly mentioned',
+      ],
+      use: [
+        'Retrieves specification facts for Ask My World answers',
+        'Tracks milestone document changes for Goals',
+        'Indexes project proposals for quick reference',
+      ],
+      control: [
+        'Select specific folders to index or exclude',
+        'Disconnect Drive context completely',
+        'Clear document vector embeddings instantly',
+      ],
+    },
+    brandColor: 'text-amber-500 bg-amber-50 border-amber-100',
+  },
+  {
+    id: 'notion',
+    name: 'Notion',
+    category: 'Workspace Integration',
+    description: 'Notes, projects and knowledge from your workspace.',
+    humanPermissionSummary: 'Read workspace pages and notes you share.',
+    status: 'not_connected',
+    statusLabel: 'Not connected',
+    contextItems: ['Pages', 'Databases', 'Project docs'],
+    uses: [
+      'Pages and databases you choose to share',
+      'Relevant project tasks and specs',
+      'Related notes and workspace documents',
+    ],
+    wonts: [
+      'Change your pages without your approval',
+      'Delete database records or pages',
+      'Access workspace content outside granted pages',
+    ],
+    permissions: {
+      access: [
+        'Pages and database entries shared with Nexorbit integration',
+        'Task status fields and inline text blocks',
+      ],
+      use: [
+        'Connects team notes to personal Goals',
+        'Integrates database roadmaps into Ask My World search',
+      ],
+      control: [
+        'Manage page-level workspace permissions inside Notion',
+        'Disconnect integration anytime',
+      ],
+    },
+    brandColor: 'text-slate-700 bg-slate-100 border-slate-200',
+  },
+  {
+    id: 'github',
+    name: 'GitHub',
+    category: 'Developer Platform',
+    description: 'Repositories, issues and development activity.',
+    humanPermissionSummary: 'Read commit logs, issue titles, and pull requests.',
+    status: 'not_connected',
+    statusLabel: 'Not connected',
+    contextItems: ['Issues', 'Pull Requests', 'Commits'],
+    uses: [
+      'Repository discussions, issues, and pull requests',
+      'Development progress and release milestones',
+      'Code commit summaries and change logs',
+    ],
+    wonts: [
+      'Push code or make commits directly',
+      'Modify pull requests or close issues automatically',
+      'Expose private repository code',
+    ],
+    permissions: {
+      access: [
+        'Selected repository issue titles and PR statuses',
+        'Commit logs and release notes',
+      ],
+      use: [
+        'Cross-references developer updates with project Goals',
+        'Tracks engineering progress in What Changed',
+      ],
+      control: [
+        'Grant access to specific repos only',
+        'Revoke GitHub OAuth access anytime',
+      ],
+    },
+    brandColor: 'text-slate-900 bg-slate-100 border-slate-300',
+  },
+];
+
+export const AVAILABLE_SECONDARY_CONNECTORS: ConnectorItem[] = [
+  {
+    id: 'slack',
+    name: 'Slack',
+    category: 'Workspace Integration',
+    description: 'Channels and message threads for team alignment.',
+    humanPermissionSummary: 'Read public messages in selected channels.',
+    status: 'not_connected',
+    statusLabel: 'Not connected',
+    uses: ['Message threads in selected public channels', 'Mentions and team decisions'],
+    wonts: ['Post messages without approval', 'Read direct messages unless permitted'],
+    permissions: {
+      access: ['Channel message history and thread replies'],
+      use: ['Synthesizes team updates for What Changed'],
+      control: ['Select specific channels to index'],
+    },
+  },
+  {
+    id: 'outlook',
+    name: 'Microsoft Outlook',
+    category: 'Productivity',
+    description: 'Mail and calendar for enterprise communication.',
+    humanPermissionSummary: 'Read enterprise emails and calendar invites.',
+    status: 'not_connected',
+    statusLabel: 'Not connected',
+    uses: ['Email correspondence and meeting invites'],
+    wonts: ['Send emails on your behalf'],
+    permissions: {
+      access: ['Inbox headers and calendar slots'],
+      use: ['Cross-check schedule in Clean My Day'],
+      control: ['Disconnect anytime'],
+    },
+  },
+  {
+    id: 'onedrive',
+    name: 'Microsoft OneDrive',
+    category: 'Productivity',
+    description: 'Cloud document storage for team files.',
+    humanPermissionSummary: 'Read shared files and office documents.',
+    status: 'not_connected',
+    statusLabel: 'Not connected',
+    uses: ['Office documents and shared PDFs'],
+    wonts: ['Modify files'],
+    permissions: {
+      access: ['Document text content'],
+      use: ['Contextual search in Ask My World'],
+      control: ['Select folders to connect'],
+    },
+  },
+  {
+    id: 'dropbox',
+    name: 'Dropbox',
+    category: 'Productivity',
+    description: 'File sync and folder organization.',
+    humanPermissionSummary: 'Access shared Dropbox folders.',
+    status: 'not_connected',
+    statusLabel: 'Not connected',
+    uses: ['Project folders and shared media briefs'],
+    wonts: ['Delete or rename files'],
+    permissions: {
+      access: ['Folder tree and text file content'],
+      use: ['Reference material indexing'],
+      control: ['Disconnect with one click'],
+    },
+  },
+];
