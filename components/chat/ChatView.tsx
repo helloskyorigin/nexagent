@@ -314,6 +314,9 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 } catch (e) {}
                 accumulatedText = accumulatedText.substring(separatorIdx + 21);
                 parsingSources = false;
+              } else if (!accumulatedText.startsWith('[') || accumulatedText.length > 8192) {
+                // Regular response text without sources preamble
+                parsingSources = false;
               }
             }
 
@@ -336,8 +339,6 @@ export const ChatView: React.FC<ChatViewProps> = ({
           user?.uid || null,
           'ai',
           finalResponseText,
-          undefined,
-          undefined,
           extractedSources.length > 0 ? extractedSources : undefined
         );
       } catch (err: any) {
@@ -368,10 +369,12 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
     let pendingQuery = initialQuery;
     let pendingMode = initialMode;
+    let pendingWebSearch = false;
 
     if (typeof window !== 'undefined') {
       const storedQuery = sessionStorage.getItem('pending_ask_command');
       const storedMode = sessionStorage.getItem('pending_chat_mode');
+      const storedSearch = sessionStorage.getItem('pending_web_search');
       if (storedQuery) {
         pendingQuery = storedQuery;
         sessionStorage.removeItem('pending_ask_command');
@@ -379,6 +382,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
       if (storedMode) {
         pendingMode = storedMode;
         sessionStorage.removeItem('pending_chat_mode');
+      }
+      if (storedSearch) {
+        pendingWebSearch = true;
+        sessionStorage.removeItem('pending_web_search');
       }
     }
 
@@ -395,7 +402,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
           pendingMode
         );
         setActiveConvId(newConv.id);
-        await executeQuery(clean, newConv.id);
+        if (pendingWebSearch) {
+          setWebSearchEnabled(true);
+        }
+        await executeQuery(clean, newConv.id, undefined, pendingWebSearch);
       })();
     }
   }, [initialQuery, initialMode, user?.uid, executeQuery, setActiveConvId]);

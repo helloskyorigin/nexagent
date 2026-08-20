@@ -43,10 +43,15 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Decide if we need web search
+    const userQuery = (
+      prompt ||
+      (formattedMessages.filter((m: any) => m.role === "user").slice(-1)[0]?.content || "")
+    ).trim();
+
     let requiresWebSearch = webSearchEnabled === true;
     
-    if (!requiresWebSearch && braveApiKey && prompt) {
-      // Automatic detection (Fast decision)
+    // Only attempt auto-detection if webSearchEnabled was not explicitly passed as false
+    if (webSearchEnabled === undefined && !requiresWebSearch && braveApiKey && userQuery) {
       try {
         const decisionRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
           method: "POST",
@@ -55,7 +60,7 @@ export async function POST(req: NextRequest) {
             model: "openai/gpt-oss-120b",
             messages: [
               { role: "system", content: "You decide if a query requires up-to-date web search. Respond with 'YES' if it asks about current events, news, recent facts, weather, live data, or very specific obscure facts that require lookup. Respond with 'NO' if it is a general coding question, math, writing task, casual chat, or general knowledge." },
-              { role: "user", content: prompt }
+              { role: "user", content: userQuery }
             ],
             temperature: 0,
             max_tokens: 5,
@@ -75,58 +80,126 @@ export async function POST(req: NextRequest) {
     let searchContext = "";
     let extractedSources: any[] = [];
     
-    if (requiresWebSearch) {
+    if (requiresWebSearch && userQuery) {
       if (!braveApiKey) {
-        // We lack the key, just proceed normally
-        console.warn("BRAVE_SEARCH_API_KEY missing, skipping web search.");
+        console.warn("[Web Search] BRAVE_SEARCH_API_KEY environment variable is not configured.");
+        searchContext = `\nWEB SEARCH NOTICE: Web search was requested, but live search provider is temporarily unconfigured. Answer based on your knowledge while noting live web data is unavailable.`;
       } else {
         try {
-          // Determine freshness dynamically based on prompt (basic heuristic)
+          // Determine freshness dynamically based on query keywords
           let freshness = "";
-          const pLower = prompt.toLowerCase();
-          if (pLower.includes("today") || pLower.includes("latest") || pLower.includes("current")) {
+          const pLower = userQuery.toLowerCase();
+          if (pLower.includes("today") || pLower.includes("latest") || pLower.includes("current") || pLower.includes("breaking") || pLower.includes("live") || pLower.includes("now")) {
             freshness = "pd"; // past day
-          } else if (pLower.includes("this week")) {
+          } else if (pLower.includes("this week") || pLower.includes("yesterday") || pLower.includes("recent")) {
             freshness = "pw"; // past week
+          } else if (pLower.includes("this month") || pLower.includes("this year") || pLower.includes("2026") || pLower.includes("2025")) {
+            freshness = "pm"; // past month
           }
           
           const braveUrl = new URL("https://api.search.brave.com/res/v1/web/search");
-          braveUrl.searchParams.set("q", prompt);
+          braveUrl.searchParams.set("q", userQuery);
           braveUrl.searchParams.set("count", "5");
+          braveUrl.searchParams.set("text_decorations", "0");
+          braveUrl.searchParams.set("search_lang", "en");
           if (freshness) braveUrl.searchParams.set("freshness", freshness);
 
+          // Use AbortController for reliable 8s timeout
+          const searchController = new AbortController();
+          const searchTimeout = setTimeout(() => searchController.abort(), 8000);
+
           const searchRes = await fetch(braveUrl.toString(), {
+            method: "GET",
             headers: {
               "Accept": "application/json",
               "Accept-Encoding": "gzip",
-              "X-Subscription-Token": braveApiKey
-            }
+              "X-Subscription-Token": braveApiKey.trim(),
+            },
+            signal: searchController.signal,
           });
+
+          clearTimeout(searchTimeout);
 
           if (searchRes.ok) {
             const searchData = await searchRes.json();
             const results = searchData.web?.results || [];
             
+            const cleanText = (str: string) => {
+              if (!str) return "";
+              return str
+                .replace(/<\/?[^>]+(>|$)/g, "")
+                .replace(/&amp;/g, "&")
+                .replace(/&quot;/g, '"')
+                .replace(/&#39;/g, "'")
+                .replace(/&apos;/g, "'")
+                .replace(/&lt;/g, "<")
+                .replace(/&gt;/g, ">")
+                .replace(/\s+/g, " ")
+                .trim();
+            };
+
             if (results.length > 0) {
-              searchContext = "WEB SEARCH RESULTS FOR CONTEXT:\n\n";
+              searchContext = "WEB SEARCH RESULTS FOR CONTEXT (Retrieved in real-time from verified sources):\n\n";
               results.forEach((r: any, idx: number) => {
-                const domainId = new URL(r.url).hostname.replace('www.', '');
-                extractedSources.push({
-                  id: `web-${idx}`,
+                let domainId = "web";
+                try {
+                  if (r.url) {
+                    domainId = new URL(r.url).hostname.replace(/^www\./, "");
+                  }
+                } catch {
+                  domainId = "web";
+                }
+
+                const cleanedTitle = cleanText(r.title) || domainId;
+                const rawSnippet = cleanText(r.description || r.snippet || "");
+                const snippet = rawSnippet.length > 320 ? rawSnippet.substring(0, 317) + "..." : rawSnippet;
+                const publishedDate = r.page_age || r.published_time || undefined;
+
+                const sourceItem = {
+                  id: `web-${idx + 1}`,
                   connector: 'web',
                   connectorName: domainId,
-                  title: r.title,
-                  url: r.url,
+                  title: cleanedTitle,
+                  url: r.url || "",
                   domain: domainId,
-                  snippet: r.description
-                });
-                searchContext += `Source [${idx + 1}]:\nTitle: ${r.title}\nURL: ${r.url}\nSnippet: ${r.description}\n\n`;
+                  snippet: snippet,
+                  rank: idx + 1,
+                  publishedDate: publishedDate,
+                  favicon: r.profile?.img || `https://www.google.com/s2/favicons?domain=${domainId}&sz=32`,
+                };
+
+                extractedSources.push(sourceItem);
+                searchContext += `Source [${idx + 1}]:\nTitle: ${sourceItem.title}\nDomain: ${domainId}\nURL: ${sourceItem.url}\n${publishedDate ? `Published: ${publishedDate}\n` : ""}Snippet: ${sourceItem.snippet}\n\n`;
               });
-              searchContext += "\nINSTRUCTIONS: Use the above sources to answer the query accurately. Prioritize this information. Avoid inventing facts. If sources disagree, mention it. ALWAYS cite your factual claims using inline brackets corresponding to the source number, like [1] or [2]. DO NOT dump the snippets directly; synthesize the answer.";
+
+              searchContext += `\nWEB SEARCH SYNTHESIS INSTRUCTIONS:
+1. Ground your answer primarily in the verified facts and details provided in the search sources above.
+2. Synthesize the findings into a clear, cohesive, and direct answer. Do not blindly copy-paste snippets or dump bulleted excerpts.
+3. Do NOT hallucinate or extrapolate facts beyond what the search results substantiate.
+4. Do NOT invent fake URLs or sources.
+5. If the sources conflict on a detail, neutrally highlight the disagreement.
+6. If the search results are insufficient to fully answer the query, clearly state what is verified by the sources and what remains unknown.
+7. Maintain Nexorbit's natural tone, style, and concise formatting.`;
+            } else {
+              searchContext = `\nWEB SEARCH CONTEXT:
+The real-time web search for "${userQuery}" returned zero live results.
+INSTRUCTIONS:
+- State clearly that live search yielded no results for this specific query.
+- Do not invent facts, fabricate sources, or pretend information was web-verified.
+- Provide a helpful response based on your general knowledge if applicable, noting that it is not verified with live web data.`;
             }
+          } else {
+            console.warn(`[Web Search] Brave Search API returned HTTP ${searchRes.status}`);
+            searchContext = `\nWEB SEARCH NOTICE: Live web search provider returned status ${searchRes.status}. Answer based on your knowledge while noting real-time web data could not be fetched.`;
           }
-        } catch (e) {
-          console.error("Brave search failed", e);
+        } catch (e: any) {
+          if (e?.name === 'AbortError') {
+            console.warn("[Web Search] Brave Search request timed out.");
+            searchContext = `\nWEB SEARCH NOTICE: Real-time search timed out. Answer based on your knowledge while noting live search is unavailable.`;
+          } else {
+            console.error("[Web Search] Brave search network error:", e?.message || e);
+            searchContext = `\nWEB SEARCH NOTICE: Real-time search network issue. Answer based on your knowledge while noting live search is unavailable.`;
+          }
         }
       }
     }

@@ -29,6 +29,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   onNavigate,
 }) => {
   const [commandText, setCommandText] = useState('');
+  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
 
   // Rotates deterministically approximately every 5 hours
   const [activeHeadline] = useState(() => {
@@ -38,13 +39,16 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   });
 
   // Submit prompt to real Chat session
-  const handleSubmit = (e?: React.FormEvent) => {
+  const handleSubmit = (e?: React.FormEvent, attachments?: any[], useWebSearch?: boolean) => {
     if (e) e.preventDefault();
     const clean = commandText.trim();
     if (!clean) return;
 
     if (typeof window !== 'undefined') {
       sessionStorage.setItem('pending_ask_command', clean);
+      if (useWebSearch || webSearchEnabled) {
+        sessionStorage.setItem('pending_web_search', 'true');
+      }
     }
 
     onNavigate('chat');
@@ -86,6 +90,8 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
             inputText={commandText}
             onChangeText={setCommandText}
             onSubmit={handleSubmit}
+            webSearchEnabled={webSearchEnabled}
+            onToggleWebSearch={() => setWebSearchEnabled(!webSearchEnabled)}
             placeholder="Ask anything"
           />
         </div>

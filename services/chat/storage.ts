@@ -14,6 +14,19 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 
+export interface SourceItem {
+  id?: string;
+  connector?: string;
+  connectorName?: string;
+  title: string;
+  url?: string;
+  domain?: string;
+  snippet?: string;
+  rank?: number;
+  publishedDate?: string;
+  favicon?: string;
+}
+
 export interface ChatMessage {
   id: string;
   conversationId: string;
@@ -25,12 +38,7 @@ export interface ChatMessage {
   imageStyle?: string;
   imageAspectRatio?: string;
   isImageError?: boolean;
-  sourcesUsed?: Array<{
-    id?: string;
-    title: string;
-    url?: string;
-    domain?: string;
-  }>;
+  sourcesUsed?: SourceItem[];
   attachments?: Array<{
     id: string;
     name: string;
