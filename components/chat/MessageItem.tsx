@@ -374,12 +374,12 @@ export interface TypingIndicatorProps {
   isStreaming?: boolean;
 }
 
-export const TypingIndicator: React.FC<TypingIndicatorProps> = ({ isStreaming = false }) => {
+export const TypingIndicator: React.FC<TypingIndicatorProps> = ({ status, isStreaming = false }) => {
   return (
-    <div className="w-full max-w-3xl mx-auto mt-2 mb-4 flex items-center h-6 select-none animate-fadeIn">
+    <div className="w-full max-w-3xl mx-auto mt-2 mb-4 flex items-center gap-2.5 h-6 select-none animate-fadeIn">
       <div
-        className="relative flex items-center justify-center w-5 h-5"
-        title={isStreaming ? "Nexorbit AI is active" : "Nexorbit AI is thinking..."}
+        className="relative flex items-center justify-center w-5 h-5 shrink-0"
+        title={status || (isStreaming ? "Nexorbit AI is active" : "Nexorbit AI is thinking...")}
       >
         {/* Subtle Orbital Ring */}
         <div
@@ -409,6 +409,12 @@ export const TypingIndicator: React.FC<TypingIndicatorProps> = ({ isStreaming = 
           )}
         />
       </div>
+
+      {status && (
+        <span className="text-xs text-[#8E8EA0] font-medium tracking-wide animate-pulse">
+          {status}
+        </span>
+      )}
     </div>
   );
 };

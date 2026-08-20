@@ -125,11 +125,9 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
   const [tempMode, setTempMode] = useState<'normal' | 'image' | 'library'>('normal');
 
   const [showPlusMenu, setShowPlusMenu] = useState(false);
-  const [showImagePanel, setShowImagePanel] = useState(false);
   
   // Image generation options
-  const [imagePrompt, setImagePrompt] = useState('');
-  const [imageStyle, setImageStyle] = useState('Photorealistic');
+  const [imageStyle, setImageStyle] = useState('None');
   const [imageAspectRatio, setImageAspectRatio] = useState('1:1');
 
   // Connector state - only show CONNECTED plugins
@@ -247,22 +245,13 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
 
   const handleSubmitForm = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (showImagePanel) {
-      if (!imagePrompt.trim() || isThinking) return;
-      if (onGenerateImage) {
-        onGenerateImage(imagePrompt, { style: imageStyle, aspectRatio: imageAspectRatio });
-        setShowImagePanel(false);
-        setImagePrompt('');
-      }
-      return;
-    }
 
     if (activeMode === 'image') {
       if (!inputText.trim() || isThinking) return;
       if (onGenerateImage) {
-        onGenerateImage(inputText.trim(), { style: 'None', aspectRatio: '1:1' });
+        onGenerateImage(inputText.trim(), { style: imageStyle, aspectRatio: imageAspectRatio });
         setInputText('');
-        setActiveMode('normal');
+        handleClearMode();
       }
       return;
     }
@@ -272,10 +261,9 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
 
     // Clear temporary modes after submission
     if (activeMode === 'library') {
-      setActiveMode('normal');
+      handleClearMode();
     } else if (activeMode === 'connectors') {
-      setSelectedConnectors(new Set());
-      setActiveMode('normal');
+      handleClearMode();
     }
   };
 
@@ -336,7 +324,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
         className="w-full rounded-[26px] sm:rounded-[28px] bg-[#212121] border border-white/[0.12] p-2 sm:p-2.5 shadow-xl space-y-1.5 focus-within:border-white/[0.24] transition-all duration-150"
       >
         {/* Rich Compact Attachment Previews inside composer */}
-        {!showImagePanel && attachments && attachments.length > 0 && (
+        {attachments && attachments.length > 0 && (
           <div className="flex flex-wrap gap-2 px-1.5 pt-1 pb-1">
             {attachments.map(file => {
               const isImage = file.type?.startsWith('image/') || file.previewUrl;
@@ -379,91 +367,74 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
           </div>
         )}
 
-        {showImagePanel ? (
-          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
-            <div className="flex items-center justify-between mb-1">
-              <div className="flex items-center gap-2 text-[#ECECF1]">
-                <ImageIcon className="h-4.5 w-4.5 text-[#5486E9]" />
-                <span className="text-xs font-bold uppercase tracking-wider text-[#ECECF1]">Image Generation</span>
+        {/* IMAGE IDEAS & OPTIONS (When Create Image mode is active) */}
+        {activeMode === 'image' && (
+          <div className="flex flex-col gap-2 px-1.5 pt-1 pb-1 animate-in fade-in duration-200">
+            {/* Explore Ideas Chips */}
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5">
+              <div className="flex items-center gap-1 text-[11px] font-medium text-[#8E8EA0] shrink-0 mr-0.5">
+                <Sparkles className="h-3.5 w-3.5 text-[#5486E9]" />
+                <span>Ideas:</span>
               </div>
-              <button 
-                type="button" 
-                onClick={() => setShowImagePanel(false)}
-                className="p-1.5 rounded-full text-[#C5C5D2] hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-              >
-                <X className="h-4.5 w-4.5" />
-              </button>
-            </div>
-            
-            <textarea
-              autoFocus
-              value={imagePrompt}
-              onChange={(e) => setImagePrompt(e.target.value)}
-              placeholder="Describe the image you want to create..."
-              className="w-full bg-[#000000] rounded-2xl border border-[#444654] p-3.5 text-[15.5px] text-[#ECECF1] placeholder:text-[#C5C5D2]/70 focus:outline-none focus:border-[#5486E9] min-h-[90px] resize-none transition-all"
-            />
-            
-            <div className="space-y-4">
-              {/* Visual Style Picker */}
-              <div className="space-y-2">
-                <label className="text-[11px] text-[#C5C5D2] font-bold uppercase pl-1 tracking-wider">Style</label>
-                <div className="flex flex-wrap gap-2">
-                  {IMAGE_STYLES.map(style => (
-                    <button
-                      key={style.id}
-                      type="button"
-                      onClick={() => setImageStyle(style.id)}
-                      className={cn(
-                        "px-3 py-1.5 rounded-xl text-xs font-medium transition-all border cursor-pointer",
-                        imageStyle === style.id 
-                          ? "bg-[#5486E9]/20 text-white border-[#5486E9]" 
-                          : "bg-[#171717] text-[#C5C5D2] border-[#444654] hover:text-white hover:bg-[#212121]"
-                      )}
-                    >
-                      {style.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              
-              <div className="flex items-end justify-between">
-                {/* Visual Aspect Ratio Picker */}
-                <div className="space-y-2">
-                  <label className="text-[11px] text-[#C5C5D2] font-bold uppercase pl-1 tracking-wider">Aspect Ratio</label>
-                  <div className="flex gap-2">
-                    {ASPECT_RATIOS.map(ratio => (
-                      <button
-                        key={ratio.id}
-                        type="button"
-                        onClick={() => setImageAspectRatio(ratio.id)}
-                        className={cn(
-                          "flex flex-col items-center justify-center p-2 rounded-xl transition-all border min-w-[52px] cursor-pointer",
-                          imageAspectRatio === ratio.id 
-                            ? "bg-[#5486E9]/20 text-white border-[#5486E9]" 
-                            : "bg-[#171717] text-[#C5C5D2] border-[#444654] hover:text-white hover:bg-[#212121]"
-                        )}
-                        title={ratio.label}
-                      >
-                        <span className="text-sm leading-none mb-1">{ratio.icon}</span>
-                        <span className="text-[10px] font-semibold">{ratio.id}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
+              {[
+                'Cyberpunk neon workspace at night',
+                'Minimal 3D geometric icon',
+                'Serene mountain landscape at sunrise',
+                'Retro futuristic AI avatar',
+                'Modern architectural glass house'
+              ].map((idea, idx) => (
                 <button
-                  type="submit"
-                  disabled={!imagePrompt.trim() || isThinking}
-                  className="h-11 px-6 rounded-xl bg-[#5486E9] hover:bg-[#4375D8] disabled:opacity-40 text-white text-sm font-semibold flex items-center gap-2 transition-all active:scale-95 shadow-md cursor-pointer"
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    onChangeText(idea);
+                    if (textareaRef.current) {
+                      textareaRef.current.focus();
+                    }
+                  }}
+                  className="px-2.5 py-1 rounded-full bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-[11.5px] text-[#ECECF1] hover:text-white transition-all shrink-0 cursor-pointer whitespace-nowrap active:scale-95"
                 >
-                  <Sparkles className="h-4.5 w-4.5" />
-                  Generate
+                  {idea}
                 </button>
+              ))}
+            </div>
+
+            {/* Compact Style and Aspect Ratio selector options */}
+            <div className="flex items-center gap-2 text-xs">
+              <div className="flex items-center gap-1 bg-white/[0.04] border border-white/10 rounded-lg px-2 py-1 text-[#C5C5D2]">
+                <span className="text-[11px] text-[#8E8EA0]">Style:</span>
+                <select
+                  value={imageStyle}
+                  onChange={(e) => setImageStyle(e.target.value)}
+                  className="bg-transparent text-[11.5px] text-[#ECECF1] focus:outline-none cursor-pointer"
+                >
+                  {IMAGE_STYLES.map(s => (
+                    <option key={s.id} value={s.id} className="bg-[#212121] text-white">
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-1 bg-white/[0.04] border border-white/10 rounded-lg px-2 py-1 text-[#C5C5D2]">
+                <span className="text-[11px] text-[#8E8EA0]">Ratio:</span>
+                <select
+                  value={imageAspectRatio}
+                  onChange={(e) => setImageAspectRatio(e.target.value)}
+                  className="bg-transparent text-[11.5px] text-[#ECECF1] focus:outline-none cursor-pointer"
+                >
+                  {ASPECT_RATIOS.map(r => (
+                    <option key={r.id} value={r.id} className="bg-[#212121] text-white">
+                      {r.id} ({r.label})
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
-        ) : (
-          <div className="flex items-end gap-1.5 sm:gap-2 px-1">
+        )}
+
+        <div className="flex items-end gap-1.5 sm:gap-2 px-1">
             {/* PLUS BUTTON & TOOL MENU */}
             <div className="relative shrink-0 mb-0.5" ref={menuRef}>
               <button
@@ -711,7 +682,6 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
               )}
             </div>
           </div>
-        )}
       </form>
     </div>
   );

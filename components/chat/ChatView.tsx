@@ -627,7 +627,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
           {/* Request / Sending State Dot (when thinking and not streaming yet) */}
           {isThinking && streamingResponse === null && (
-            <TypingIndicator isStreaming={false} />
+            <TypingIndicator status={searchStatus} isStreaming={false} />
           )}
 
           {/* Empty State if no messages yet */}
