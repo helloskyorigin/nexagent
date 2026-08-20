@@ -54,6 +54,24 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
     onNavigate('chat');
   };
 
+  // Submit manual image creation from Home composer
+  const handleGenerateImage = (prompt: string, options: { style?: string; aspectRatio?: string }) => {
+    const clean = prompt.trim();
+    if (!clean) return;
+
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('pending_ask_command', clean);
+      if (options.style && options.style !== 'None') {
+        sessionStorage.setItem('pending_image_style', options.style);
+      }
+      if (options.aspectRatio) {
+        sessionStorage.setItem('pending_image_ratio', options.aspectRatio);
+      }
+    }
+
+    onNavigate('chat');
+  };
+
   return (
     <div className="relative min-h-[calc(100vh-3.5rem)] w-full flex flex-col justify-center select-none overflow-x-hidden bg-[#000000] text-[#ECECF1]">
       {/* BACKGROUND AESTHETICS (Subtle cosmic orbital art) */}
@@ -90,6 +108,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
             inputText={commandText}
             onChangeText={setCommandText}
             onSubmit={handleSubmit}
+            onGenerateImage={handleGenerateImage}
             webSearchEnabled={webSearchEnabled}
             onToggleWebSearch={() => setWebSearchEnabled(!webSearchEnabled)}
             placeholder="Ask anything"

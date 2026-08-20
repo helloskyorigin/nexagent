@@ -10,6 +10,7 @@ import { RenameModal } from './RenameModal';
 import { useAuth } from '../auth/AuthContext';
 import { ChatAttachment } from './types';
 import { getStoredSettings } from '../../services/settings/settingsService';
+import { detectImageIntent } from '../../services/ai/imageIntent';
 import {
   createNewConversation,
   addMessageToConversation,
@@ -140,6 +141,112 @@ export const ChatView: React.FC<ChatViewProps> = ({
     return () => unsubscribe();
   }, [activeConvId, user?.uid]);
 
+  // Handle image generation
+  const handleGenerateImage = useCallback(
+    async (
+      prompt: string,
+      options?: { style?: string; aspectRatio?: string },
+      targetConvId?: string | null
+    ) => {
+      if (isThinking || streamingResponse !== null) return;
+
+      setIsThinking(true);
+      setStreamingResponse(null);
+      setSearchStatus(null);
+
+      let convId = targetConvId || activeConvId;
+
+      // 1. Create conversation if none exists
+      if (!convId) {
+        const cleanPrompt = prompt.trim();
+        const titleText = cleanPrompt.length > 36 ? cleanPrompt.substring(0, 36) + '...' : cleanPrompt;
+        const createdConv = await createNewConversation(
+          user?.uid || null,
+          titleText,
+          'chat',
+          currentMode
+        );
+        convId = createdConv.id;
+        setActiveConvId(convId);
+      }
+
+      // 2. Add User Message (Preserving user's exact natural prompt)
+      const displayPrompt = prompt.trim();
+      await addMessageToConversation(
+        convId,
+        user?.uid || null,
+        'user',
+        displayPrompt
+      );
+
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
+      // 3. Call Image API
+      try {
+        const res = await fetch('/api/image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify({
+            prompt: displayPrompt,
+            style: options?.style,
+            aspectRatio: options?.aspectRatio,
+            userId: user?.uid,
+          }),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || 'Image generation failed');
+        }
+
+        const data = await res.json();
+
+        if (data.error || !data.imageUrl) {
+          throw new Error(data.error || 'Image generation failed');
+        }
+
+        // 4. Add AI Response with generated Image
+        await addMessageToConversation(
+          convId,
+          user?.uid || null,
+          'ai',
+          '',
+          undefined,
+          undefined,
+          data.imageUrl,
+          displayPrompt,
+          options?.style,
+          options?.aspectRatio
+        );
+      } catch (err: any) {
+        if (err?.name === 'AbortError') {
+          return;
+        }
+        console.error('Image Generation Error:', err);
+        await addMessageToConversation(
+          convId,
+          user?.uid || null,
+          'ai',
+          "Couldn't generate the image. Please try again.",
+          undefined,
+          undefined,
+          undefined,
+          displayPrompt,
+          options?.style,
+          options?.aspectRatio,
+          true
+        );
+      } finally {
+        abortControllerRef.current = null;
+        setIsThinking(false);
+        setSearchStatus(null);
+      }
+    },
+    [activeConvId, currentMode, isThinking, streamingResponse, user?.uid, setActiveConvId]
+  );
+
   // Execute AI query (handles both initial and follow-up messages on SAME conversation)
   const executeQuery = useCallback(
     async (
@@ -151,9 +258,19 @@ export const ChatView: React.FC<ChatViewProps> = ({
       const activeAttachments = pendingAttachments !== undefined ? pendingAttachments : attachments;
       if ((!queryText.trim() && activeAttachments.length === 0) || isThinking || streamingResponse !== null) return;
 
+      let convId = targetConvId || activeConvId;
+
+      // 0. Detect Image Generation Intent directly from natural language
+      if (!useWebSearch && (!activeAttachments || activeAttachments.length === 0) && queryText.trim()) {
+        const imageIntent = detectImageIntent(queryText);
+        if (imageIntent.isImageIntent) {
+          await handleGenerateImage(imageIntent.cleanedPrompt, undefined, convId);
+          return;
+        }
+      }
+
       setIsThinking(true);
       setStreamingResponse(null);
-      let convId = targetConvId || activeConvId;
 
       // 1. Process files if any
       const attachmentsToProcess = [...activeAttachments];
@@ -360,7 +477,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
         setSearchStatus(null);
       }
     },
-    [activeConvId, currentMode, isThinking, streamingResponse, messages, user, attachments, setActiveConvId]
+    [activeConvId, currentMode, isThinking, streamingResponse, messages, user, attachments, setActiveConvId, handleGenerateImage]
   );
 
   // Process pending ask command from Home screen composer
@@ -370,11 +487,16 @@ export const ChatView: React.FC<ChatViewProps> = ({
     let pendingQuery = initialQuery;
     let pendingMode = initialMode;
     let pendingWebSearch = false;
+    let pendingImageStyle: string | null = null;
+    let pendingImageRatio: string | null = null;
 
     if (typeof window !== 'undefined') {
       const storedQuery = sessionStorage.getItem('pending_ask_command');
       const storedMode = sessionStorage.getItem('pending_chat_mode');
       const storedSearch = sessionStorage.getItem('pending_web_search');
+      const storedImageStyle = sessionStorage.getItem('pending_image_style');
+      const storedImageRatio = sessionStorage.getItem('pending_image_ratio');
+
       if (storedQuery) {
         pendingQuery = storedQuery;
         sessionStorage.removeItem('pending_ask_command');
@@ -386,6 +508,14 @@ export const ChatView: React.FC<ChatViewProps> = ({
       if (storedSearch) {
         pendingWebSearch = true;
         sessionStorage.removeItem('pending_web_search');
+      }
+      if (storedImageStyle) {
+        pendingImageStyle = storedImageStyle;
+        sessionStorage.removeItem('pending_image_style');
+      }
+      if (storedImageRatio) {
+        pendingImageRatio = storedImageRatio;
+        sessionStorage.removeItem('pending_image_ratio');
       }
     }
 
@@ -405,87 +535,15 @@ export const ChatView: React.FC<ChatViewProps> = ({
         if (pendingWebSearch) {
           setWebSearchEnabled(true);
         }
-        await executeQuery(clean, newConv.id, undefined, pendingWebSearch);
+
+        if (pendingImageStyle || pendingImageRatio) {
+          await handleGenerateImage(clean, { style: pendingImageStyle || undefined, aspectRatio: pendingImageRatio || undefined }, newConv.id);
+        } else {
+          await executeQuery(clean, newConv.id, undefined, pendingWebSearch);
+        }
       })();
     }
-  }, [initialQuery, initialMode, user?.uid, executeQuery, setActiveConvId]);
-
-  // Handle image generation
-  const handleGenerateImage = async (prompt: string, options: { style?: string; aspectRatio?: string }) => {
-    if (isThinking || streamingResponse !== null) return;
-
-    setIsThinking(true);
-    setSearchStatus('Generating image...');
-
-    let convId = activeConvId;
-
-    // 1. Create conversation if none exists
-    if (!convId) {
-      const titleText = prompt.length > 36 ? prompt.substring(0, 36) + '...' : prompt;
-      const createdConv = await createNewConversation(
-        user?.uid || null,
-        `Image: ${titleText}`,
-        'chat',
-        currentMode
-      );
-      convId = createdConv.id;
-      setActiveConvId(convId);
-    }
-
-    // 2. Add User Message
-    await addMessageToConversation(
-      convId,
-      user?.uid || null,
-      'user',
-      `Create image: ${prompt}${options.style && options.style !== 'None' ? ` (Style: ${options.style})` : ''}`
-    );
-
-    // 3. Call Image API
-    try {
-      const res = await fetch('/api/image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt,
-          style: options.style,
-          aspectRatio: options.aspectRatio,
-          userId: user?.uid,
-        }),
-      });
-
-      if (!res.ok) {
-        throw new Error('Image generation failed');
-      }
-
-      const data = await res.json();
-
-      if (data.error) {
-        throw new Error(data.error);
-      }
-
-      // 4. Add AI Response with Image
-      await addMessageToConversation(
-        convId,
-        user?.uid || null,
-        'ai',
-        `Generated image for: "${prompt}"`,
-        undefined,
-        undefined,
-        data.imageUrl
-      );
-    } catch (err: any) {
-      console.error('Image Generation Error:', err);
-      await addMessageToConversation(
-        convId,
-        user?.uid || null,
-        'ai',
-        "Couldn't generate the image. Please try again."
-      );
-    } finally {
-      setIsThinking(false);
-      setSearchStatus(null);
-    }
-  };
+  }, [initialQuery, initialMode, user?.uid, executeQuery, handleGenerateImage, setActiveConvId]);
 
   // Handle composer submission in Chat Workspace
   const handleComposerSubmit = (e?: React.FormEvent, submitAttachments?: any[], useWebSearch?: boolean) => {
@@ -592,27 +650,29 @@ export const ChatView: React.FC<ChatViewProps> = ({
                   message={msg}
                   onRegenerate={() => {
                     // Find the last user message to use as prompt
+                    const msgIndex = messages.indexOf(msg);
                     const lastUserMsg = messages
-                      .slice(0, messages.indexOf(msg))
+                      .slice(0, msgIndex >= 0 ? msgIndex : messages.length)
                       .reverse()
                       .find((m) => m.sender === 'user');
                     
-                    if (msg.imageUrl && lastUserMsg) {
-                      // It's an image message, use handleGenerateImage
-                      // We can try to parse the prompt from the text or user message
-                      // The user message text for images is "Create image: [prompt] (Style: [style])"
-                      const text = lastUserMsg.text;
-                      if (text.startsWith('Create image: ')) {
-                        const styleMatch = text.match(/\(Style: (.*)\)$/);
-                        const style = styleMatch ? styleMatch[1] : 'None';
-                        const prompt = text.replace('Create image: ', '').replace(/\(Style: (.*)\)$/, '').trim();
-                        handleGenerateImage(prompt, { style });
+                    if (msg.imageUrl || msg.isImageError) {
+                      const promptToUse = msg.imagePrompt || lastUserMsg?.text || '';
+                      if (promptToUse) {
+                        const imageIntent = detectImageIntent(promptToUse);
+                        const cleanPrompt = imageIntent.isImageIntent ? imageIntent.cleanedPrompt : promptToUse;
+                        handleGenerateImage(cleanPrompt, { style: msg.imageStyle, aspectRatio: msg.imageAspectRatio });
                         return;
                       }
                     }
 
                     if (lastUserMsg) {
-                      executeQuery(lastUserMsg.text, activeConvId);
+                      const imageIntent = !webSearchEnabled ? detectImageIntent(lastUserMsg.text) : { isImageIntent: false, cleanedPrompt: lastUserMsg.text };
+                      if (imageIntent.isImageIntent) {
+                        handleGenerateImage(imageIntent.cleanedPrompt);
+                      } else {
+                        executeQuery(lastUserMsg.text, activeConvId);
+                      }
                     }
                   }}
                 />

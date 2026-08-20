@@ -285,7 +285,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
     if (webSearchEnabled && onToggleWebSearch) {
       onToggleWebSearch();
     }
-    setActiveMode('connectors');
+    setTempMode('normal');
     setShowPlusMenu(false);
   };
 
