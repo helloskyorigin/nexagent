@@ -126,7 +126,26 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
     setTimeout(() => setIsRegenerating(false), 3000);
   };
 
-  const hasSources = message.sourcesUsed && message.sourcesUsed.length > 0;
+  const uniqueSources = React.useMemo(() => {
+    if (!message.sourcesUsed || message.sourcesUsed.length === 0) return [];
+    const seenUrls = new Set<string>();
+    const list: typeof message.sourcesUsed = [];
+
+    for (const item of message.sourcesUsed) {
+      if (!item.url) {
+        list.push(item);
+        continue;
+      }
+      const normalizedUrl = item.url.trim().toLowerCase().replace(/\/$/, '');
+      if (!seenUrls.has(normalizedUrl)) {
+        seenUrls.add(normalizedUrl);
+        list.push(item);
+      }
+    }
+    return list;
+  }, [message.sourcesUsed]);
+
+  const hasSources = uniqueSources.length > 0;
 
   return (
     <div className="w-full max-w-3xl mx-auto mt-0 mb-2 animate-fadeIn group/msg">
@@ -176,48 +195,73 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
                   </div>
                 </div>
               )}
-              <MarkdownRenderer content={message.text} />
+              <MarkdownRenderer content={message.text} sourcesUsed={message.sourcesUsed} />
 
               {/* Sources Section */}
               {hasSources && (
-                <div className="mt-6 pt-4 border-t border-[#444654]">
-                  <h4 className="text-[11px] font-semibold text-[#C5C5D2] mb-3 flex items-center gap-1.5 uppercase tracking-wider">
-                    <Globe className="h-3 w-3" />
-                    Sources
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {message.sourcesUsed!.map((source, idx) => (
-                      <a
-                        key={source.id || idx}
-                        href={source.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex flex-col gap-1 p-2.5 rounded-xl bg-[#171717] border border-[#444654] hover:bg-[#212121] hover:border-[#5486E9] transition-all cursor-pointer min-w-[200px] max-w-[240px] group shadow-sm"
-                      >
-                        <div className="flex items-center gap-1.5">
-                          <div className="h-3.5 w-3.5 shrink-0 rounded-[2px] overflow-hidden flex items-center justify-center relative">
-                            {source.domain ? (
-                              <Image 
-                                src={`https://www.google.com/s2/favicons?domain=${source.domain}&sz=32`} 
-                                alt="" 
-                                fill
-                                sizes="14px"
-                                className="object-cover" 
-                                referrerPolicy="no-referrer"
-                              />
-                            ) : (
-                              <Globe className="h-3 w-3 text-[#C5C5D2]" />
+                <div className="mt-6 pt-4 border-t border-white/[0.08]">
+                  <div className="flex items-center justify-between mb-3 select-none">
+                    <h4 className="text-[11px] font-semibold text-[#A1A1AA] flex items-center gap-1.5 uppercase tracking-wider">
+                      <Globe className="h-3 w-3 text-[#5486E9]" />
+                      <span>Sources ({uniqueSources.length})</span>
+                    </h4>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {uniqueSources.map((source, idx) => {
+                      const originalIndex = message.sourcesUsed?.findIndex((s) => s.url === source.url) ?? idx;
+                      const citationNum = originalIndex + 1;
+
+                      return (
+                        <a
+                          key={source.id || source.url || idx}
+                          href={source.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex flex-col justify-between p-3 rounded-xl bg-[#171717] border border-white/[0.08] hover:bg-[#1E1E22] hover:border-[#5486E9]/60 transition-all cursor-pointer group shadow-sm text-left"
+                        >
+                          <div>
+                            <div className="flex items-center justify-between gap-2 mb-1.5">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <div className="h-4 w-4 shrink-0 rounded-[3px] overflow-hidden flex items-center justify-center relative bg-[#24242A]">
+                                  {source.domain ? (
+                                    <img
+                                      src={`https://www.google.com/s2/favicons?domain=${source.domain}&sz=32`}
+                                      alt=""
+                                      className="w-3.5 h-3.5 object-cover"
+                                      referrerPolicy="no-referrer"
+                                    />
+                                  ) : (
+                                    <Globe className="h-3 w-3 text-[#A1A1AA]" />
+                                  )}
+                                </div>
+                                <span className="text-[11.5px] font-medium text-[#A1A1AA] truncate group-hover:text-[#ECECF1] transition-colors">
+                                  {source.domain || source.connectorName || 'Web source'}
+                                </span>
+                              </div>
+                              <span className="inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded text-[10px] font-mono font-semibold text-[#5486E9] bg-[#5486E9]/10 border border-[#5486E9]/20 shrink-0">
+                                {citationNum}
+                              </span>
+                            </div>
+
+                            <h5 className="text-[13px] font-medium text-[#ECECF1] line-clamp-2 leading-snug group-hover:text-[#5486E9] transition-colors mb-1">
+                              {source.title}
+                            </h5>
+
+                            {source.snippet && (
+                              <p className="text-[11.5px] text-[#8E8EA0] line-clamp-2 leading-relaxed font-normal">
+                                {source.snippet}
+                              </p>
                             )}
                           </div>
-                          <span className="text-[11px] font-medium text-[#C5C5D2] truncate group-hover:text-[#ECECF1] transition-colors">
-                            {source.connectorName || source.domain || 'Web'}
-                          </span>
-                        </div>
-                        <span className="text-[13px] font-medium text-[#ECECF1] line-clamp-2 leading-snug group-hover:text-[#5486E9] transition-colors">
-                          {source.title}
-                        </span>
-                      </a>
-                    ))}
+
+                          <div className="mt-2.5 pt-2 border-t border-white/[0.04] flex items-center justify-between text-[11px] text-[#8E8EA0] group-hover:text-[#5486E9] transition-colors">
+                            <span className="truncate max-w-[180px]">{source.domain || 'Visit source'}</span>
+                            <ExternalLink className="h-3 w-3 shrink-0 opacity-60 group-hover:opacity-100 transition-opacity" />
+                          </div>
+                        </a>
+                      );
+                    })}
                   </div>
                 </div>
               )}

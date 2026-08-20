@@ -1,6 +1,69 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getMemories, createMemory } from "@/services/memory/memoryService";
 
+// Deterministic helper for intelligent auto web search
+function shouldAutoSearch(query: string): boolean {
+  if (!query || query.trim().length === 0) return false;
+
+  const q = query.trim().toLowerCase();
+
+  // 1. Exclude simple greetings & casual conversation
+  if (/^(hi|hello|hey|greetings|good (morning|afternoon|evening)|how are you|who are you|what is your name|thanks|thank you)(\s*|\!|\.|\?)*$/.test(q)) {
+    return false;
+  }
+
+  // 2. Exclude common coding/syntax queries unless explicit live docs/versions requested
+  if (
+    /^(how to|how do i|write a|create a|implement|function|code|class|component|script|css|html|regex|sql query)/.test(q) &&
+    !/(latest version|new features in|released in|documentation for|current api|breaking changes)/.test(q)
+  ) {
+    if (/in (javascript|typescript|python|java|c\+\+|c#|react|next\.js|node|rust|go|php|ruby|swift|kotlin|git|bash|docker|css|html|sql)/.test(q)) {
+      return false;
+    }
+  }
+
+  // 3. Exclude math & basic calculation requests
+  if (/^(\d+[\+\-\*\/\^%\s\(\)]+)+\d+$/.test(q) || /^solve\s+/i.test(q) || /^calculate\s+/i.test(q) || /^evaluate\s+/i.test(q)) {
+    return false;
+  }
+
+  // 4. Exclude creative writing / transformation requests without live context
+  if (/^(write a|compose a|draft a|write an|summarize|rewrite|translate|rephrase|paraphrase|proofread|format|explain the code)/.test(q) && !/(news|article|event|today|latest|current)/.test(q)) {
+    return false;
+  }
+
+  // 5. Exclude static conceptual explanations
+  if (/^explain\s+(photosynthesis|gravity|relativity|quantum|evolution|calculus|thermodynamics|mitosis|dna)/.test(q)) {
+    return false;
+  }
+
+  // POSITIVE SIGNALS FOR AUTO SEARCH:
+
+  // Explicit search intent phrases
+  if (/(search (for|the web|online)|look up|find online|check online|google|browse for|search web)/.test(q)) {
+    return true;
+  }
+
+  // Temporal & freshness indicators
+  if (/\b(today('s)?|tonight|yesterday|this week|this month|this year|right now|currently|latest|breaking news|up to date|recent|recently|live|2025|2026)\b/.test(q)) {
+    return true;
+  }
+
+  // Real-time facts, financial, weather, sports & current state indicators
+  if (
+    /\b(weather|forecast|stock price|exchange rate|crypto|bitcoin|ethereum|market price|sports score|who won|match result|standings|election|winner|release date|movie times|flight status|current price|how much is|current ceo|current president|current prime minister|current governor|current status|score of)\b/.test(q)
+  ) {
+    return true;
+  }
+
+  // News & real-world events
+  if (/\b(news|headline|event|announcement|launch of|scandal|happened (to|in|at)|what is happening|current situation)\b/.test(q)) {
+    return true;
+  }
+
+  return false;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { prompt, messages, webSearchEnabled, attachments, userId, memoryEnabled } = await req.json();
@@ -48,32 +111,12 @@ export async function POST(req: NextRequest) {
       (formattedMessages.filter((m: any) => m.role === "user").slice(-1)[0]?.content || "")
     ).trim();
 
+    // Manual Web Search toggle overrides auto-detection if explicitly enabled (webSearchEnabled === true)
+    // Otherwise, intelligently auto-detect if the query requires live/current web context
     let requiresWebSearch = webSearchEnabled === true;
     
-    // Only attempt auto-detection if webSearchEnabled was not explicitly passed as false
-    if (webSearchEnabled === undefined && !requiresWebSearch && braveApiKey && userQuery) {
-      try {
-        const decisionRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-          method: "POST",
-          headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: "openai/gpt-oss-120b",
-            messages: [
-              { role: "system", content: "You decide if a query requires up-to-date web search. Respond with 'YES' if it asks about current events, news, recent facts, weather, live data, or very specific obscure facts that require lookup. Respond with 'NO' if it is a general coding question, math, writing task, casual chat, or general knowledge." },
-              { role: "user", content: userQuery }
-            ],
-            temperature: 0,
-            max_tokens: 5,
-          }),
-        });
-        if (decisionRes.ok) {
-          const decisionData = await decisionRes.json();
-          const decisionText = decisionData.choices?.[0]?.message?.content?.trim().toUpperCase() || 'NO';
-          if (decisionText.includes('YES')) requiresWebSearch = true;
-        }
-      } catch (e) {
-        console.error("Failed to route search decision", e);
-      }
+    if (!requiresWebSearch && userQuery) {
+      requiresWebSearch = shouldAutoSearch(userQuery);
     }
 
     // 3. Perform Web Search if needed
