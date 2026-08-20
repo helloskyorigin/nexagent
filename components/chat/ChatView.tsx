@@ -244,7 +244,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
         setSearchStatus(null);
       }
     },
-    [activeConvId, currentMode, isThinking, streamingResponse, user?.uid, setActiveConvId]
+    [activeConvId, currentMode, isThinking, streamingResponse, user, setActiveConvId]
   );
 
   // Execute AI query (handles both initial and follow-up messages on SAME conversation)

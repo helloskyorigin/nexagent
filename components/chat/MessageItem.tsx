@@ -191,7 +191,7 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
                     )}
                     <a
                       href={message.imageUrl}
-                      download={`nexorbit-${Date.now()}.jpg`}
+                      download={message.id ? `nexorbit-${message.id}.jpg` : 'nexorbit-image.jpg'}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-1.5 text-[11.5px] font-semibold text-[#ECECF1] hover:text-white px-2.5 py-1.5 rounded-lg bg-white/[0.08] hover:bg-white/[0.15] transition-all active:scale-95 cursor-pointer"
