@@ -63,6 +63,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [isThinking, setIsThinking] = useState(false);
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
+  const [deepThinkEnabled, setDeepThinkEnabled] = useState(false);
   const [searchStatus, setSearchStatus] = useState<string | null>(null);
   const [isUserScrolledUp, setIsUserScrolledUp] = useState(false);
   const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
@@ -253,7 +254,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
       queryText: string,
       targetConvId?: string | null,
       pendingAttachments?: ChatAttachment[],
-      useWebSearch?: boolean
+      useWebSearch?: boolean,
+      useDeepThink?: boolean
     ) => {
       const activeAttachments = pendingAttachments !== undefined ? pendingAttachments : attachments;
       if ((!queryText.trim() && activeAttachments.length === 0) || isThinking || streamingResponse !== null) return;
@@ -396,6 +398,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
             attachments: fileContexts, // Send all relevant file context
             userId: user?.uid,
             memoryEnabled: userSettings.memoryEnabled,
+            deepThinkEnabled: useDeepThink !== undefined ? useDeepThink : deepThinkEnabled,
           }),
         });
 
@@ -487,6 +490,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
     let pendingQuery = initialQuery;
     let pendingMode = initialMode;
     let pendingWebSearch = false;
+    let pendingDeepThink = false;
     let pendingImageStyle: string | null = null;
     let pendingImageRatio: string | null = null;
 
@@ -494,6 +498,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
       const storedQuery = sessionStorage.getItem('pending_ask_command');
       const storedMode = sessionStorage.getItem('pending_chat_mode');
       const storedSearch = sessionStorage.getItem('pending_web_search');
+      const storedDeepThink = sessionStorage.getItem('pending_deep_think');
       const storedImageStyle = sessionStorage.getItem('pending_image_style');
       const storedImageRatio = sessionStorage.getItem('pending_image_ratio');
 
@@ -508,6 +513,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
       if (storedSearch) {
         pendingWebSearch = true;
         sessionStorage.removeItem('pending_web_search');
+      }
+      if (storedDeepThink) {
+        pendingDeepThink = true;
+        sessionStorage.removeItem('pending_deep_think');
       }
       if (storedImageStyle) {
         pendingImageStyle = storedImageStyle;
@@ -535,18 +544,26 @@ export const ChatView: React.FC<ChatViewProps> = ({
         if (pendingWebSearch) {
           setWebSearchEnabled(true);
         }
+        if (pendingDeepThink) {
+          setDeepThinkEnabled(true);
+        }
 
         if (pendingImageStyle || pendingImageRatio) {
           await handleGenerateImage(clean, { style: pendingImageStyle || undefined, aspectRatio: pendingImageRatio || undefined }, newConv.id);
         } else {
-          await executeQuery(clean, newConv.id, undefined, pendingWebSearch);
+          await executeQuery(clean, newConv.id, undefined, pendingWebSearch, pendingDeepThink);
         }
       })();
     }
   }, [initialQuery, initialMode, user?.uid, executeQuery, handleGenerateImage, setActiveConvId]);
 
   // Handle composer submission in Chat Workspace
-  const handleComposerSubmit = (e?: React.FormEvent, submitAttachments?: any[], useWebSearch?: boolean) => {
+  const handleComposerSubmit = (
+    e?: React.FormEvent,
+    submitAttachments?: any[],
+    useWebSearch?: boolean,
+    useDeepThink?: boolean
+  ) => {
     if (e) e.preventDefault();
     if (!inputText.trim() && attachments.length === 0) return;
 
@@ -554,9 +571,14 @@ export const ChatView: React.FC<ChatViewProps> = ({
     const currentAttachments = submitAttachments || [...attachments];
     setInputText('');
     setAttachments([]);
-    // Turn off explicit web search after submit to prevent accidental consecutive searches if desired, or keep it on. The prompt: "If the user explicitly turns Web Search ON: use search for that message. If the user turns it OFF: return to normal Chat." Usually it resets or stays. I will keep it on if user enabled it.
 
-    executeQuery(query, null, currentAttachments, useWebSearch !== undefined ? useWebSearch : webSearchEnabled);
+    executeQuery(
+      query,
+      null,
+      currentAttachments,
+      useWebSearch !== undefined ? useWebSearch : webSearchEnabled,
+      useDeepThink !== undefined ? useDeepThink : deepThinkEnabled
+    );
   };
 
   // Header Title
@@ -751,6 +773,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
           onStop={handleStopGeneration}
           webSearchEnabled={webSearchEnabled}
           onToggleWebSearch={() => setWebSearchEnabled(!webSearchEnabled)}
+          deepThinkEnabled={deepThinkEnabled}
+          onToggleDeepThink={() => setDeepThinkEnabled(!deepThinkEnabled)}
           onGenerateImage={handleGenerateImage}
         />
       </footer>

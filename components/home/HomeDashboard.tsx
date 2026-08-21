@@ -30,6 +30,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
 }) => {
   const [commandText, setCommandText] = useState('');
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
+  const [deepThinkEnabled, setDeepThinkEnabled] = useState(false);
 
   // Rotates deterministically approximately every 5 hours
   const [activeHeadline] = useState(() => {
@@ -39,7 +40,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   });
 
   // Submit prompt to real Chat session
-  const handleSubmit = (e?: React.FormEvent, attachments?: any[], useWebSearch?: boolean) => {
+  const handleSubmit = (e?: React.FormEvent, attachments?: any[], useWebSearch?: boolean, useDeepThink?: boolean) => {
     if (e) e.preventDefault();
     const clean = commandText.trim();
     if (!clean) return;
@@ -48,6 +49,9 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
       sessionStorage.setItem('pending_ask_command', clean);
       if (useWebSearch || webSearchEnabled) {
         sessionStorage.setItem('pending_web_search', 'true');
+      }
+      if (useDeepThink || deepThinkEnabled) {
+        sessionStorage.setItem('pending_deep_think', 'true');
       }
     }
 
@@ -111,6 +115,8 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
             onGenerateImage={handleGenerateImage}
             webSearchEnabled={webSearchEnabled}
             onToggleWebSearch={() => setWebSearchEnabled(!webSearchEnabled)}
+            deepThinkEnabled={deepThinkEnabled}
+            onToggleDeepThink={() => setDeepThinkEnabled(!deepThinkEnabled)}
             placeholder="Ask anything"
           />
         </div>

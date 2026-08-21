@@ -32,12 +32,12 @@ export interface SlideMenuProps {
 }
 
 const MENU_ITEMS = [
-  { id: 'home', label: 'Home', icon: <Home className="h-5 w-5" /> },
-  { id: 'chat', label: 'Chat', icon: <MessageSquare className="h-5 w-5" /> },
+  { id: 'home', label: 'Work', icon: <Home className="h-5 w-5" /> },
+  { id: 'chat', label: 'Projects', icon: <MessageSquare className="h-5 w-5" /> },
   { id: 'tasks', label: 'Tasks', icon: <CheckSquare className="h-5 w-5" /> },
-  { id: 'missions', label: 'Agent', icon: <Target className="h-5 w-5" /> },
+  { id: 'missions', label: 'Autopilot', icon: <Target className="h-5 w-5" /> },
   { id: 'memory', label: 'Memory', icon: <Box className="h-5 w-5" /> },
-  { id: 'connected-apps', label: 'Plugins', icon: <LayoutGrid className="h-5 w-5" /> },
+  { id: 'connected-apps', label: 'Connect', icon: <LayoutGrid className="h-5 w-5" /> },
   { id: 'library', label: 'Library', icon: <BookOpen className="h-5 w-5" /> },
   { id: 'settings', label: 'Settings', icon: <SettingsIcon className="h-5 w-5" /> },
   { id: 'support', label: 'Support', icon: <HelpCircle className="h-5 w-5" /> },

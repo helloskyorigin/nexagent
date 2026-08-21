@@ -46,9 +46,9 @@ export interface NavItem {
 }
 
 export const FIXED_NAV_ITEMS: NavItem[] = [
-  { id: 'home', label: 'New Chat', targetPage: 'home', icon: <SquarePen className="h-5.5 w-5.5 text-[#ECECF1] group-hover:text-white stroke-[2.2]" /> },
-  { id: 'agent', label: 'Agent', targetPage: 'missions', icon: <Bot className="h-5.5 w-5.5 text-[#ECECF1] group-hover:text-white stroke-[2.2]" /> },
-  { id: 'plugins', label: 'Plugins', targetPage: 'connected-apps', icon: <Blocks className="h-5.5 w-5.5 text-[#ECECF1] group-hover:text-white stroke-[2.2]" /> },
+  { id: 'home', label: 'Work', targetPage: 'home', icon: <SquarePen className="h-5.5 w-5.5 text-[#ECECF1] group-hover:text-white stroke-[2.2]" /> },
+  { id: 'agent', label: 'Autopilot', targetPage: 'missions', icon: <Bot className="h-5.5 w-5.5 text-[#ECECF1] group-hover:text-white stroke-[2.2]" /> },
+  { id: 'plugins', label: 'Connect', targetPage: 'connected-apps', icon: <Blocks className="h-5.5 w-5.5 text-[#ECECF1] group-hover:text-white stroke-[2.2]" /> },
 ];
 
 export const SCROLLABLE_NAV_ITEMS: NavItem[] = [
@@ -369,12 +369,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           })}
         </nav>
 
-        {/* CHAT SECTION */}
+        {/* PROJECTS SECTION */}
         {!isCollapsed && (
           <div className="pt-3 border-t border-white/[0.05] space-y-1.5">
             <div className="flex items-center justify-between px-2.5 py-1">
               <span className="text-[12px] font-bold text-[#C5C5D2] uppercase tracking-wider">
-                Chat
+                Projects
               </span>
             </div>
 

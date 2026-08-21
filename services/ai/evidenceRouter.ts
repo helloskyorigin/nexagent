@@ -32,6 +32,7 @@ export interface RouterInputParams {
   braveApiKeyAvailable?: boolean;
   hasAttachments?: boolean;
   hasConnectors?: boolean;
+  deepThinkEnabled?: boolean;
 }
 
 /**

@@ -3,7 +3,8 @@ import { getMemories, createMemory } from "@/services/memory/memoryService";
 import { extractIntentAndGoal } from "@/services/ai/intentEngine";
 import { buildContextPackage, ChatMessageItem } from "@/services/ai/contextBrain";
 import { routeEvidenceAndTools } from "@/services/ai/evidenceRouter";
-import { buildResponseStrategy } from "@/services/ai/responseStrategy";
+import { generateResponseStrategy } from "@/services/ai/responseStrategy";
+import { evaluateDeepThinkPolicy } from "@/services/ai/deepThinkEngine";
 
 // Deterministic helper for intelligent auto web search
 function shouldAutoSearch(query: string): boolean {
@@ -70,7 +71,7 @@ function shouldAutoSearch(query: string): boolean {
 
 export async function POST(req: NextRequest) {
   try {
-    const { prompt, messages, webSearchEnabled, attachments, userId, memoryEnabled } = await req.json();
+    const { prompt, messages, webSearchEnabled, attachments, userId, memoryEnabled, deepThinkEnabled } = await req.json();
 
     const apiKey = process.env.GROQ_API_KEY;
     const braveApiKey = process.env.BRAVE_SEARCH_API_KEY;
@@ -135,6 +136,7 @@ ${r1Result.secondaryIntent ? `- SECONDARY INTENT: ${r1Result.secondaryIntent}\n`
       historyMessages: rawMessages,
       availableMemories: userMemories,
       attachments: attachments && Array.isArray(attachments) ? attachments : [],
+      deepThinkEnabled: !!deepThinkEnabled,
     });
 
     let fileContext = "";
@@ -160,6 +162,7 @@ ${r1Result.secondaryIntent ? `- SECONDARY INTENT: ${r1Result.secondaryIntent}\n`
       braveApiKeyAvailable: !!braveApiKey,
       hasAttachments: !!attachments && attachments.length > 0,
       hasConnectors: false,
+      deepThinkEnabled: !!deepThinkEnabled,
     });
 
     let r3Context = "";
@@ -168,11 +171,12 @@ ${r1Result.secondaryIntent ? `- SECONDARY INTENT: ${r1Result.secondaryIntent}\n`
     }
 
     // 6. R4 Response Strategy Engine
-    const r4Strategy = buildResponseStrategy({
+    const r4Strategy = generateResponseStrategy({
       userQuery,
       r1Result,
       r2Package,
       r3Decision,
+      deepThinkEnabled: !!deepThinkEnabled,
     });
 
     let r4Context = "";
@@ -180,7 +184,17 @@ ${r1Result.secondaryIntent ? `- SECONDARY INTENT: ${r1Result.secondaryIntent}\n`
       r4Context = `\n\n${r4Strategy.strategySummaryText}`;
     }
 
-    // 7. Perform Web Search if planned by R3 router
+    // 7. R5 Deep Think Mode Policy Engine
+    const r5DeepThink = evaluateDeepThinkPolicy({
+      userQuery,
+      r1Result,
+      r2Package,
+      r3Decision,
+      r4Strategy,
+      deepThinkEnabled: !!deepThinkEnabled,
+    });
+
+    // 6. Perform Web Search if planned by R3 router
     let searchContext = "";
     let extractedSources: any[] = [];
     const requiresWebSearch = r3Decision.tools.includes('brave_search') || r3Decision.primarySources.includes('WEB');
@@ -354,6 +368,10 @@ RESPONSE BREVITY & STYLE MANDATES:
 
     if (r4Context) {
       systemContent += `${r4Context}`;
+    }
+
+    if (r5DeepThink.systemPromptAddendum) {
+      systemContent += `${r5DeepThink.systemPromptAddendum}`;
     }
 
     // Memory Detection Instructions

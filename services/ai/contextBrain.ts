@@ -348,33 +348,38 @@ function selectRelevantConversationTurns(
   userQuery: string,
   r1Result: R1IntentResult,
   history: ChatMessageItem[],
-  resolvedRefs: ResolvedReference[]
+  resolvedRefs: ResolvedReference[],
+  deepThinkEnabled?: boolean
 ): ChatMessageItem[] {
   if (!history || history.length === 0) return [];
 
   // Exclude current message if it's already at the end
   const pastTurns = history.filter(m => m.content !== userQuery);
-  if (pastTurns.length <= 4) {
+  const minKeep = deepThinkEnabled ? 4 : 2;
+  if (pastTurns.length <= minKeep) {
     return pastTurns;
   }
 
   const selectedIndices = new Set<number>();
 
-  // 1. Always keep the most recent 2 turns (1 exchange) for immediate flow
+  // 1. Keep the most recent turns (2 turns for normal, 4 turns for Deep Think) for immediate flow
   const total = pastTurns.length;
-  selectedIndices.add(total - 1);
-  if (total >= 2) selectedIndices.add(total - 2);
+  const recentWindow = deepThinkEnabled ? 4 : 2;
+  for (let k = 1; k <= Math.min(recentWindow, total); k++) {
+    selectedIndices.add(total - k);
+  }
 
   // 2. Score older turns based on topic & keyword overlap
   const queryKeywords = extractKeywords(userQuery + ' ' + (r1Result.goal || ''));
+  const overlapThreshold = deepThinkEnabled ? 0.15 : 0.25;
 
-  for (let i = 0; i < total - 2; i++) {
+  for (let i = 0; i < total - recentWindow; i++) {
     const turn = pastTurns[i];
     const turnKeywords = extractKeywords(turn.content);
     const overlap = computeKeywordOverlap(queryKeywords, turnKeywords);
 
     // If turn has strong topic overlap or contains referenced code/options
-    if (overlap > 0.25) {
+    if (overlap > overlapThreshold) {
       selectedIndices.add(i);
       // If user turn was selected, keep the subsequent assistant reply for context
       if (turn.role === 'user' && i + 1 < total) {
@@ -405,9 +410,10 @@ export function buildContextPackage(params: {
   historyMessages: ChatMessageItem[];
   availableMemories?: MemoryRecord[];
   attachments?: Array<{ name: string; content: string }>;
+  deepThinkEnabled?: boolean;
 }): R2ContextPackage {
   try {
-    const { userQuery, r1Result, historyMessages, availableMemories = [], attachments = [] } = params;
+    const { userQuery, r1Result, historyMessages, availableMemories = [], attachments = [], deepThinkEnabled } = params;
 
     // 1. Reference Resolution & Active State Tracking
     const { resolved: resolvedReferences, activeState } = resolveReferences(
@@ -435,7 +441,8 @@ export function buildContextPackage(params: {
       userQuery,
       r1Result,
       historyMessages,
-      resolvedReferences
+      resolvedReferences,
+      deepThinkEnabled
     );
 
     // 5. Build Internal Context Package Directive

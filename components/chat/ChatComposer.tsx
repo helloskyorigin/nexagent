@@ -19,7 +19,8 @@ import {
   Settings,
   Plus,
   Square,
-  Loader2
+  Loader2,
+  Brain
 } from 'lucide-react';
 import { ChatAttachment } from './types';
 import { useToast } from '../ui/Toast';
@@ -37,7 +38,7 @@ const formatFileSize = (bytes?: number): string => {
 export interface ChatComposerProps {
   inputText: string;
   onChangeText: (text: string) => void;
-  onSubmit: (e?: React.FormEvent, attachments?: ChatAttachment[], webSearchEnabled?: boolean) => void;
+  onSubmit: (e?: React.FormEvent, attachments?: ChatAttachment[], webSearchEnabled?: boolean, deepThinkEnabled?: boolean) => void;
   attachments?: ChatAttachment[];
   onAddAttachments?: (files: ChatAttachment[]) => void;
   onRemoveAttachment?: (id: string) => void;
@@ -46,6 +47,8 @@ export interface ChatComposerProps {
   placeholder?: string;
   webSearchEnabled?: boolean;
   onToggleWebSearch?: () => void;
+  deepThinkEnabled?: boolean;
+  onToggleDeepThink?: () => void;
   className?: string;
   onGenerateImage?: (prompt: string, options: { style?: string; aspectRatio?: string }) => void;
 }
@@ -114,6 +117,8 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
   placeholder,
   webSearchEnabled = false,
   onToggleWebSearch,
+  deepThinkEnabled = false,
+  onToggleDeepThink,
   className,
   onGenerateImage,
 }) => {
@@ -257,7 +262,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
     }
 
     if ((!inputText.trim() && attachments.length === 0) || isThinking) return;
-    onSubmit(e, attachments, webSearchEnabled);
+    onSubmit(e, attachments, webSearchEnabled, deepThinkEnabled);
 
     // Clear temporary modes after submission
     if (activeMode === 'library') {
@@ -536,6 +541,30 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                       {webSearchEnabled && <CheckCircle2 className="h-4.5 w-4.5 text-[#5486E9] ml-auto shrink-0" />}
                     </button>
 
+                    {/* 5. Deep Think mode */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (onToggleDeepThink) onToggleDeepThink();
+                        setShowPlusMenu(false);
+                      }}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#2F2F2F] transition-colors text-left group cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-purple-400"
+                    >
+                      <div className="flex items-center justify-center shrink-0 text-[#C5C5D2] group-hover:text-white transition-colors">
+                        <Brain className="h-5 w-5 stroke-[2] text-purple-400" />
+                      </div>
+                      <div className="flex flex-col min-w-0 flex-1">
+                        <span className="text-[14px] font-medium text-[#ECECF1] group-hover:text-white truncate transition-colors flex items-center gap-1.5">
+                          Deep Think
+                          {deepThinkEnabled && <span className="text-[10px] bg-purple-500/30 text-purple-300 px-1.5 py-0.5 rounded-md font-normal">ON</span>}
+                        </span>
+                        <span className="text-[12px] text-[#8E8EA0] truncate">
+                          Higher-effort reasoning & careful analysis
+                        </span>
+                      </div>
+                      {deepThinkEnabled && <CheckCircle2 className="h-4.5 w-4.5 text-purple-400 ml-auto shrink-0" />}
+                    </button>
+
                     {/* 5. Connectors (Only connected services) */}
                     {activePlugins.length > 0 && (
                       <>
@@ -574,6 +603,27 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                 </div>
               )}
             </div>
+
+            {/* DEEP THINK TOGGLE BUTTON */}
+            <button
+              type="button"
+              onClick={onToggleDeepThink}
+              aria-pressed={deepThinkEnabled}
+              aria-label={deepThinkEnabled ? "Deep Think mode enabled" : "Deep Think mode disabled"}
+              title={deepThinkEnabled ? "Deep Think ON (Higher-effort analysis)" : "Deep Think OFF (Normal response)"}
+              className={cn(
+                "h-8 px-2.5 rounded-full flex items-center gap-1.5 text-xs font-medium transition-all duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-purple-400/40 select-none shrink-0 mb-0.5",
+                deepThinkEnabled
+                  ? "bg-purple-500/20 text-purple-200 border border-purple-500/40 shadow-[0_0_12px_rgba(168,85,247,0.2)]"
+                  : "bg-transparent text-[#8E8EA0] hover:text-[#ECECF1] hover:bg-white/[0.08] border border-transparent"
+              )}
+            >
+              <Brain className={cn("h-4 w-4 shrink-0 transition-colors", deepThinkEnabled ? "text-purple-300" : "text-[#8E8EA0]")} />
+              <span className="font-medium text-[12.5px]">Deep Think</span>
+              {deepThinkEnabled && (
+                <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse ml-0.5" />
+              )}
+            </button>
 
             {/* SELECTED TOOL INDICATOR */}
             {activeMode !== 'normal' ? (
