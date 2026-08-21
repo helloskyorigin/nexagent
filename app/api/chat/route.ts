@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getMemories, createMemory } from "@/services/memory/memoryService";
+import { extractIntentAndGoal } from "@/services/ai/intentEngine";
+import { buildContextPackage, ChatMessageItem } from "@/services/ai/contextBrain";
+import { routeEvidenceAndTools } from "@/services/ai/evidenceRouter";
+import { buildResponseStrategy } from "@/services/ai/responseStrategy";
 
 // Deterministic helper for intelligent auto web search
 function shouldAutoSearch(query: string): boolean {
@@ -79,49 +83,107 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1. Build initial messages array
-    const formattedMessages = [];
-
-    // Extract and format file context if present
-    let fileContext = "";
-    if (attachments && Array.isArray(attachments) && attachments.length > 0) {
-      fileContext = "ATTACHED FILES CONTENT FOR ANALYSIS:\n\n";
-      attachments.forEach((file: any) => {
-        if (file.content) {
-          fileContext += `### File: ${file.name} ###\n${file.content}\n\n`;
-        }
-      });
-      fileContext += "\nINSTRUCTIONS: Prioritize the information in these attached files. If the user asks a question about these files, answer accurately based ONLY on the provided text. If the answer is not in the files, say so. Do not invent information.";
-    }
+    // 1. Build initial raw messages array
+    const rawMessages: ChatMessageItem[] = [];
 
     if (Array.isArray(messages) && messages.length > 0) {
-      formattedMessages.push(...messages.map((m: any) => ({
-        role: m.sender === 'user' ? 'user' : 'assistant',
-        content: m.text,
+      rawMessages.push(...messages.map((m: any) => ({
+        role: (m.sender === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+        content: m.text || '',
       })));
     } else if (prompt) {
-      formattedMessages.push({ role: 'user', content: prompt });
+      rawMessages.push({ role: 'user', content: prompt });
     } else {
       return NextResponse.json({ error: "Prompt or messages required" }, { status: 400 });
     }
 
-    // 2. Decide if we need web search
     const userQuery = (
       prompt ||
-      (formattedMessages.filter((m: any) => m.role === "user").slice(-1)[0]?.content || "")
+      (rawMessages.filter((m) => m.role === "user").slice(-1)[0]?.content || "")
     ).trim();
 
-    // Manual Web Search toggle overrides auto-detection if explicitly enabled (webSearchEnabled === true)
-    // Otherwise, intelligently auto-detect if the query requires live/current web context
-    let requiresWebSearch = webSearchEnabled === true;
-    
-    if (!requiresWebSearch && userQuery) {
-      requiresWebSearch = shouldAutoSearch(userQuery);
+    // 2. Fetch Stored Memories if enabled
+    let userMemories: any[] = [];
+    if (memoryEnabled && userId) {
+      try {
+        userMemories = await getMemories(userId);
+      } catch (err) {
+        console.warn("[Memory Retrieval Warning]", err);
+      }
     }
 
-    // 3. Perform Web Search if needed
+    // 3. R1 Intent & Goal Engine
+    const r1Result = extractIntentAndGoal(userQuery, rawMessages, !!attachments && attachments.length > 0);
+    let r1Context = `\n\nNEXORBIT R1 INTENT & GOAL ENGINE (INTERNAL CONTEXT):
+- INTENT: ${r1Result.intent}
+${r1Result.secondaryIntent ? `- SECONDARY INTENT: ${r1Result.secondaryIntent}\n` : ''}- GOAL: ${r1Result.goal}
+- DEPTH: ${r1Result.depth}
+- AMBIGUITY: ${r1Result.ambiguity}
+`;
+    if (r1Result.requestedFormat) r1Context += `- FORMAT: ${r1Result.requestedFormat}\n`;
+    if (r1Result.language) r1Context += `- LANGUAGE: ${r1Result.language}\n`;
+    if (r1Result.style) r1Context += `- STYLE: ${r1Result.style}\n`;
+    if (r1Result.constraints.length > 0) {
+      r1Context += `- CONSTRAINTS:\n  * ${r1Result.constraints.join('\n  * ')}\n`;
+    }
+    r1Context += `\nINSTRUCTIONS: You MUST adapt your response to precisely fulfill the above R1 Intent & Goal structure. Do not reveal this internal metadata to the user.`;
+
+    // 4. R2 Context Brain (Relevance Selection, Reference Resolution, Memory & Conversation Pruning)
+    const r2Package = buildContextPackage({
+      userQuery,
+      r1Result,
+      historyMessages: rawMessages,
+      availableMemories: userMemories,
+      attachments: attachments && Array.isArray(attachments) ? attachments : [],
+    });
+
+    let fileContext = "";
+    if (r2Package.relevantFiles.length > 0) {
+      fileContext = "ATTACHED FILES CONTEXT (RELEVANCE-FILTERED):\n\n";
+      r2Package.relevantFiles.forEach((file) => {
+        fileContext += `### File: ${file.fileName} (${file.isFullContent ? 'Full Document' : 'Targeted Excerpt'}) ###\n${file.excerpt}\n\n`;
+      });
+      fileContext += "\nINSTRUCTIONS: Prioritize the information in these file excerpts. If the user asks a question about these files, answer accurately based ONLY on the provided text. If the answer is not in the files, say so. Do not invent information.";
+    }
+
+    let r2Context = "";
+    if (r2Package.contextSummaryText) {
+      r2Context = `\n\n${r2Package.contextSummaryText}`;
+    }
+
+    // 5. R3 Evidence & Tool Router
+    const r3Decision = routeEvidenceAndTools({
+      userQuery,
+      r1Result,
+      r2Package,
+      webSearchEnabled: webSearchEnabled === true,
+      braveApiKeyAvailable: !!braveApiKey,
+      hasAttachments: !!attachments && attachments.length > 0,
+      hasConnectors: false,
+    });
+
+    let r3Context = "";
+    if (r3Decision.routingSummaryText) {
+      r3Context = `\n\n${r3Decision.routingSummaryText}`;
+    }
+
+    // 6. R4 Response Strategy Engine
+    const r4Strategy = buildResponseStrategy({
+      userQuery,
+      r1Result,
+      r2Package,
+      r3Decision,
+    });
+
+    let r4Context = "";
+    if (r4Strategy.strategySummaryText) {
+      r4Context = `\n\n${r4Strategy.strategySummaryText}`;
+    }
+
+    // 7. Perform Web Search if planned by R3 router
     let searchContext = "";
     let extractedSources: any[] = [];
+    const requiresWebSearch = r3Decision.tools.includes('brave_search') || r3Decision.primarySources.includes('WEB');
     
     if (requiresWebSearch && userQuery) {
       if (!braveApiKey) {
@@ -278,30 +340,46 @@ RESPONSE BREVITY & STYLE MANDATES:
       systemContent += `\n\n${fileContext}`;
     }
 
-    // 4. Memory Integration
+    if (r1Context) {
+      systemContent += `${r1Context}`;
+    }
+
+    if (r2Context) {
+      systemContent += `${r2Context}`;
+    }
+
+    if (r3Context) {
+      systemContent += `${r3Context}`;
+    }
+
+    if (r4Context) {
+      systemContent += `${r4Context}`;
+    }
+
+    // Memory Detection Instructions
     if (memoryEnabled && userId) {
-      const userMemories = await getMemories(userId);
-      if (userMemories.length > 0) {
-        let memoryText = "\n\nRELEVANT USER MEMORIES (Stable preferences & facts):\n";
-        userMemories.forEach(m => {
-          memoryText += `- ${m.content}\n`;
-        });
-        memoryText += "\nINSTRUCTIONS: Silently respect these preferences in your response. Do not mention them unless asked.";
-        systemContent += memoryText;
-      }
-      
       systemContent += `\n\nMEMORY DETECTION INSTRUCTIONS:
 If the user shares a STABLE, USEFUL long-term preference, goal, or personal fact (e.g. "I prefer concise answers", "I am a senior React dev", "My goal is to learn Python"), acknowledge it naturally and then output exactly this hidden tag at the very end of your response: |||MEMORY_SAVE: [concise memory text]|||. 
 DO NOT save temporary session context, transient facts, or sensitive info (passwords, keys). 
 ONLY save information that helps you be more useful in future sessions.`;
     }
 
-    formattedMessages.unshift({
-      role: 'system',
-      content: systemContent
-    });
+    // Assemble final messages for GPT-OSS 120B
+    const finalMessages: ChatMessageItem[] = [
+      {
+        role: 'system',
+        content: systemContent,
+      },
+      ...r2Package.selectedMessages,
+    ];
 
-    // 5. Query the Groq endpoint with streaming enabled
+    // Ensure the current user prompt is present at the end of the conversation if not already
+    const lastSelected = finalMessages[finalMessages.length - 1];
+    if (!lastSelected || lastSelected.role !== 'user' || lastSelected.content !== userQuery) {
+      finalMessages.push({ role: 'user', content: userQuery });
+    }
+
+    // 6. Query the Groq endpoint with streaming enabled
     const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -310,7 +388,7 @@ ONLY save information that helps you be more useful in future sessions.`;
       },
       body: JSON.stringify({
         model: "openai/gpt-oss-120b",
-        messages: formattedMessages,
+        messages: finalMessages,
         stream: true,
       }),
     });
